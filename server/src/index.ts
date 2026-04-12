@@ -13,7 +13,7 @@ const httpServer = createServer(app);
 // 클라이언트(Next.js) 도메인에 대한 CORS 허용
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: '*', // 내부망 어디서든 iframe으로 접근할 수 있도록 모든 출처 허용
     methods: ['GET', 'POST'],
   },
 });

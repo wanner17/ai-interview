@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ai-interview-backend
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./server/.env # OpenAI 키 등 환경변수 로드
+    restart: always # 서버 재부팅 시 자동 재실행
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # 🚨 중요: 브라우저가 백엔드에 접속할 주소입니다. 
+      # 윈도우 서버(다른 PC)에 올릴 경우 localhost 대신 해당 서버의 IP 주소(예: http://192.168.1.100:3001)를 적어주세요.
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+    depends_on:
+      - backend
+    restart: always

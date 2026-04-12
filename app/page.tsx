@@ -89,6 +89,16 @@ export default function Home() {
     };
   }, []);
 
+  // 결과 리포트가 생성되면 부모 프로젝트(iframe 외부)로 데이터 전송
+  useEffect(() => {
+    if (reportData) {
+      window.parent.postMessage({
+        type: 'AI_INTERVIEW_COMPLETED',
+        payload: reportData
+      }, '*'); // 실서비스 적용 시 '*' 대신 'https://부모프로젝트.com' 등 명시적 도메인 사용 권장
+    }
+  }, [reportData]);
+
   useEffect(() => {
     if (hasMediaPermission && videoRef.current && mediaStream) {
       videoRef.current.srcObject = mediaStream;
