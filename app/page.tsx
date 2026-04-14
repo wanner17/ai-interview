@@ -113,7 +113,7 @@ export default function Home() {
     const FaceMesh = faceMeshModule.FaceMesh || (window as any).FaceMesh;
 
     const faceMesh = new FaceMesh({
-      locateFile: (file) => {
+      locateFile: (file: string) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
       },
     });
