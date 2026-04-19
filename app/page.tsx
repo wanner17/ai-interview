@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { socket } from './socket';
 import type { Results } from '@mediapipe/face_mesh';
 
+import { LandingPage } from './components/LandingPage';
 import { MediaPermission } from './components/MediaPermission';
 import { ResumeUpload } from './components/ResumeUpload';
 import { InterviewTypeSelect } from './components/InterviewTypeSelect';
@@ -19,8 +20,8 @@ import { DebateReport } from './components/results/DebateReport';
 const API_BASE = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
 export default function Home() {
+  const [landingDone, setLandingDone] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [transport, setTransport] = useState('N/A');
 
   // 미디어 제어용 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -151,14 +152,11 @@ export default function Home() {
     function onConnect() {
       setIsConnected(true);
       setMySocketId(socket.id ?? '');
-      setTransport(socket.io.engine.transport.name);
       socket.emit('get_room_list');
       socket.emit('get_debate_room_list');
-      socket.io.engine.on('upgrade', (transport) => setTransport(transport.name));
     }
     function onDisconnect() {
       setIsConnected(false);
-      setTransport('N/A');
     }
 
     socket.on('connect', onConnect);
@@ -668,41 +666,30 @@ export default function Home() {
   if (ptResults) return <PTReport ptResults={ptResults} />;
   if (reportData) return <GeneralReport reportData={reportData} reportRef={reportRef} onDownloadPdf={handleDownloadPdf} />;
 
+  // ── 랜딩 화면 ────────────────────────────────────────────────────────────────
+  if (!landingDone) {
+    return <LandingPage onStart={() => setLandingDone(true)} />;
+  }
+
   // ── 메인 화면 ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F0F4FF] dark:bg-[#0A0A0F] p-4 md:p-8 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col items-center">
-      <header className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-blue-600/30">
-            🤖
-          </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight leading-none">AI Interview</h1>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">실시간 안면 분석 면접 시스템</p>
-          </div>
+    <div className="p-4 md:p-8 flex flex-col items-center">
+      <div className="w-full max-w-5xl flex items-center gap-2 text-xs mb-4 justify-end">
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+          isConnected ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-rose-50 border-rose-200 text-rose-500'
+        }`}>
+          <span className="relative flex h-1.5 w-1.5">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${isConnected ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${isConnected ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+          </span>
+          <span className="font-medium">{isConnected ? '연결됨' : '연결 끊김'}</span>
         </div>
-        <div className="flex items-center gap-2 text-xs font-semibold">
-          <div className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-colors ${
-            isConnected
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
-              : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20'
-          }`}>
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-            </span>
-            {isConnected ? '서버 연결됨' : '연결 끊김'}
-          </div>
-          <div className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-colors ${
-            hasMediaPermission
-              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
-              : 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-500 dark:border-zinc-700'
-          }`}>
-            {hasMediaPermission ? '🎥 카메라 ON' : '📷 카메라 대기'}
-          </div>
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+          hasMediaPermission ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400'
+        }`}>
+          <span className="font-medium">{hasMediaPermission ? '카메라 ON' : '카메라 대기'}</span>
         </div>
-      </header>
-
+      </div>
       <main className="w-full max-w-5xl flex flex-col gap-5">
         {!hasMediaPermission ? (
           <MediaPermission onRequestMedia={requestMedia} mediaError={mediaError} />

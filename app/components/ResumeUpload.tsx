@@ -18,118 +18,111 @@ export function ResumeUpload({
   onDragOver, onDragLeave, onDrop, onFileInputChange, onResumeUpload, onNext, onClearResume,
 }: ResumeUploadProps) {
   return (
-    <div className="bg-white dark:bg-[#111118] rounded-3xl shadow-xl shadow-blue-900/5 dark:shadow-black/30 border border-gray-100 dark:border-white/5 overflow-hidden">
-      <div className="h-2 bg-gradient-to-r from-violet-500 via-blue-500 to-indigo-500"></div>
-      <div className="flex flex-col items-center text-center px-8 py-12">
-        <div className="relative mb-6">
-          <div className="absolute inset-0 bg-violet-400/20 dark:bg-violet-500/10 rounded-full blur-2xl scale-150"></div>
-          <div className="relative w-20 h-20 bg-gradient-to-br from-violet-500 to-blue-600 rounded-3xl flex items-center justify-center text-3xl shadow-2xl shadow-violet-600/30">
-            📄
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-black mb-2 text-zinc-900 dark:text-white">이력서 기반 맞춤 질문</h2>
-        <p className="text-zinc-500 dark:text-zinc-400 max-w-md mb-8 leading-relaxed text-sm">
-          이력서를 업로드하면 AI가 경력·기술스택에 맞는 질문을 생성합니다.<br/>
-          건너뛰면 기본 면접 질문으로 진행됩니다.
+    <div className="flex flex-col gap-8 py-8 max-w-2xl mx-auto w-full">
+      <div className="text-center">
+        <h2 className="text-4xl font-black tracking-tight mb-3 text-gray-900">이력서를 업로드하세요</h2>
+        <p className="text-gray-400 leading-relaxed">
+          AI가 경력·기술스택에 맞는 질문을 생성합니다<br />
+          <span className="text-gray-300 text-sm">건너뛰면 기본 질문으로 진행됩니다</span>
         </p>
+      </div>
 
-        <div
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          className={`relative w-full max-w-lg border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer mb-4 ${
-            isDragging
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
-              : generatedQuestions
-              ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/10'
-              : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-500/5'
-          }`}
-          onClick={() => !isGeneratingQuestions && document.getElementById('resume-input')?.click()}
-        >
-          <input
-            id="resume-input"
-            type="file"
-            accept=".pdf,.docx,.doc,.txt"
-            className="hidden"
-            onChange={onFileInputChange}
-          />
+      {/* Drop Zone */}
+      <div
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => !isGeneratingQuestions && document.getElementById('resume-input')?.click()}
+        className={`relative rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer
+          ${isDragging ? 'border-violet-400 bg-violet-50 scale-[1.01]'
+            : generatedQuestions ? 'border-emerald-300 bg-emerald-50'
+            : 'border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50/50'}
+        `}
+      >
+        <input id="resume-input" type="file" accept=".pdf,.docx,.doc,.txt" className="hidden" onChange={onFileInputChange} />
 
+        <div className="flex flex-col items-center justify-center py-14 px-8 text-center">
           {isGeneratingQuestions ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">AI가 맞춤 질문을 생성하는 중...</p>
-            </div>
+            <>
+              <div className="relative mb-5">
+                <div className="w-14 h-14 rounded-full border-2 border-gray-100" />
+                <div className="absolute inset-0 w-14 h-14 rounded-full border-2 border-t-violet-500 animate-spin" />
+              </div>
+              <p className="font-semibold text-gray-600 text-sm">AI가 맞춤 질문을 생성하는 중...</p>
+              <p className="text-gray-400 text-xs mt-1">잠시만 기다려주세요</p>
+            </>
           ) : generatedQuestions ? (
-            <div className="flex flex-col items-center gap-2 w-full">
-              <span className="text-3xl">✅</span>
-              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{resumeFile?.name}</p>
-              <p className="text-xs text-emerald-600 dark:text-emerald-500">{generatedQuestions.length}개 맞춤 질문 생성 완료</p>
-              <ul className="mt-3 text-left space-y-2 w-full">
+            <>
+              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <p className="font-bold text-emerald-600 text-sm mb-0.5">{resumeFile?.name}</p>
+              <p className="text-emerald-500 text-xs mb-6">{generatedQuestions.length}개 맞춤 질문 생성 완료</p>
+              <div className="w-full max-w-md text-left space-y-3" onClick={(e) => e.stopPropagation()}>
                 {generatedQuestions.map((q, i) => (
-                  <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    <span className="font-bold text-blue-600 dark:text-blue-400">Q{i + 1}.</span> {q.replace(/^\d+\.\s*/, '')}
-                  </li>
+                  <div key={i} className="flex gap-3 items-start">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                    <p className="text-sm text-gray-500 leading-relaxed">{q.replace(/^\d+\.\s*/, '')}</p>
+                  </div>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </>
           ) : (
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-4xl">📎</span>
-              <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">
-                {isDragging ? '여기에 놓으세요!' : 'PDF / DOCX / TXT 파일을 드래그하거나 클릭하여 업로드'}
+            <>
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${isDragging ? 'bg-violet-100' : 'bg-gray-50'}`}>
+                <svg className={`w-7 h-7 transition-colors ${isDragging ? 'text-violet-500' : 'text-gray-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+              </div>
+              <p className={`font-semibold text-sm mb-1 ${isDragging ? 'text-violet-600' : 'text-gray-500'}`}>
+                {isDragging ? '여기에 놓으세요!' : '파일을 드래그하거나 클릭하여 업로드'}
               </p>
-              <p className="text-xs text-zinc-400">최대 10MB</p>
-            </div>
+              <p className="text-gray-300 text-xs">PDF · DOCX · TXT · 최대 10MB</p>
+            </>
           )}
         </div>
+      </div>
 
-        {resumeError && (
-          <p className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 px-4 py-2 rounded-xl mb-4">
-            ⚠️ {resumeError}
-          </p>
-        )}
-
-        <div className="flex flex-col gap-3 w-full max-w-lg">
-          <button
-            onClick={onNext}
-            disabled={isGeneratingQuestions}
-            className="w-full px-6 py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-zinc-900 font-bold rounded-2xl shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {generatedQuestions ? '맞춤 질문으로 면접 시작' : '면접 시작하기'}
-          </button>
-          <div className="flex gap-3">
-            {generatedQuestions ? (
-              <>
-                <button
-                  onClick={() => resumeFile && onResumeUpload(resumeFile)}
-                  disabled={isGeneratingQuestions}
-                  className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-semibold rounded-xl border border-gray-200 dark:border-zinc-700 shadow-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 text-sm"
-                >
-                  🔄 다시 생성하기
-                </button>
-                <button
-                  onClick={() => {
-                    onClearResume();
-                    document.getElementById('resume-input')?.click();
-                  }}
-                  disabled={isGeneratingQuestions}
-                  className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-semibold rounded-xl border border-gray-200 dark:border-zinc-700 shadow-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 text-sm"
-                >
-                  📁 파일 다시 올리기
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={onNext}
-                disabled={isGeneratingQuestions}
-                className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-semibold rounded-xl border border-gray-200 dark:border-zinc-700 shadow-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 text-sm"
-              >
-                이력서 없이 시작
-              </button>
-            )}
+      {resumeError && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4">
+          <div className="flex gap-3 items-start">
+            <svg className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <p className="text-sm text-rose-600">{resumeError}</p>
           </div>
         </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={onNext}
+          disabled={isGeneratingQuestions}
+          className="w-full py-4 rounded-2xl font-bold text-base text-white transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+          style={{ background: 'linear-gradient(135deg, #7c3aed, #6366f1)', boxShadow: '0 8px 24px rgba(124,58,237,0.2)' }}
+        >
+          {generatedQuestions ? '맞춤 질문으로 면접 시작 →' : '면접 시작하기 →'}
+        </button>
+
+        {generatedQuestions ? (
+          <div className="flex gap-3">
+            <button onClick={() => resumeFile && onResumeUpload(resumeFile)} disabled={isGeneratingQuestions}
+              className="flex-1 py-3 rounded-xl border border-gray-200 bg-white text-gray-400 text-sm font-medium hover:border-gray-300 hover:text-gray-600 transition-all disabled:opacity-40">
+              다시 생성
+            </button>
+            <button onClick={() => { onClearResume(); document.getElementById('resume-input')?.click(); }} disabled={isGeneratingQuestions}
+              className="flex-1 py-3 rounded-xl border border-gray-200 bg-white text-gray-400 text-sm font-medium hover:border-gray-300 hover:text-gray-600 transition-all disabled:opacity-40">
+              파일 변경
+            </button>
+          </div>
+        ) : (
+          <button onClick={onNext} disabled={isGeneratingQuestions}
+            className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-400 text-sm font-medium hover:border-gray-300 hover:text-gray-600 transition-all disabled:opacity-40">
+            이력서 없이 시작
+          </button>
+        )}
       </div>
     </div>
   );
