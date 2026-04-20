@@ -18,6 +18,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SOCKET_URL=https://api.eisoft.co.kr:543/interview-api
     container_name: ai-interview-frontend
     ports:
       - "3000:3000"
