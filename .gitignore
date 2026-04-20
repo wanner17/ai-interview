@@ -46,3 +46,4 @@ google-stt-key.json
 /app/generated/prisma
 /ai-interview-db-info.txt
 /server/node_modules/
+.claude/settings.json
