@@ -1,0 +1,41 @@
+datasource db {
+  provider = "mysql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 유저 정보 및 토큰 잔액
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  tokens        Int       @default(0) // 보유 토큰
+  videos        Video[]   // 내가 올린 영상
+  purchased     Purchase[] // 내가 구매한 내역
+  createdAt     DateTime  @default(now())
+}
+
+// 면접 영상 정보
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  category    String   // 개인, 집단, PT, 토론, 외국어
+  videoUrl    String   // Cloudflare R2 주소
+  price       Int      // 판매 가격 (토큰)
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+  buyers      Purchase[]
+  createdAt   DateTime @default(now())
+}
+
+// 구매 이력 (영수증)
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id])
+  video     Video    @relation(fields: [videoId], references: [id])
+  createdAt DateTime @default(now())
+}

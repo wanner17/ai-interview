@@ -42,3 +42,6 @@ next-env.d.ts
 
 # credentials (Google Cloud 등 인증 키)
 google-stt-key.json
+
+/app/generated/prisma
+/ai-interview-db-info.txt
