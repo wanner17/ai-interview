@@ -3,6 +3,8 @@ interface InterviewTypeSelectProps {
   onSelectType: (type: string) => void;
   foreignLanguage: string;
   onSelectLanguage: (lang: string) => void;
+  saveVideo: boolean;
+  onToggleSaveVideo: () => void;
   onConfirm: () => void;
 }
 
@@ -20,7 +22,7 @@ const languages = [
   { code: 'zh-CN', flag: '🇨🇳', label: '中文' },
 ];
 
-export function InterviewTypeSelect({ interviewType, onSelectType, foreignLanguage, onSelectLanguage, onConfirm }: InterviewTypeSelectProps) {
+export function InterviewTypeSelect({ interviewType, onSelectType, foreignLanguage, onSelectLanguage, saveVideo, onToggleSaveVideo, onConfirm }: InterviewTypeSelectProps) {
   return (
     <div className="flex flex-col gap-8 py-8">
       <div className="text-center">
@@ -73,6 +75,24 @@ export function InterviewTypeSelect({ interviewType, onSelectType, foreignLangua
           </div>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={onToggleSaveVideo}
+        className="flex items-center justify-between w-full rounded-2xl border-2 px-5 py-4 transition-all bg-white hover:border-gray-200"
+        style={saveVideo ? { borderColor: '#7c3aed', background: '#faf5ff' } : { borderColor: '#f3f4f6' }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🎬</span>
+          <div className="text-left">
+            <p className="text-sm font-bold text-gray-800">면접 영상 저장</p>
+            <p className="text-xs text-gray-400">면접이 끝난 후 영상을 면접 이력에 저장합니다</p>
+          </div>
+        </div>
+        <div className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${saveVideo ? 'bg-violet-600' : 'bg-gray-200'}`}>
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${saveVideo ? 'translate-x-5' : ''}`} />
+        </div>
+      </button>
 
       <button
         onClick={() => interviewType && onConfirm()}

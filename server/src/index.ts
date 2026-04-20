@@ -8,6 +8,7 @@ import { SpeechClient } from '@google-cloud/speech';
 import OpenAI from 'openai';
 import multer from 'multer';
 import { authRouter } from './routes/auth.route';
+import { videoRouter } from './routes/video.route';
 
 const app = express();
 const httpServer = createServer(app);
@@ -23,6 +24,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use('/auth', authRouter);
+app.use('/videos', videoRouter);
 
 const io = new Server(httpServer, {
   cors: { origin: clientOrigin, methods: ['GET', 'POST'], credentials: true },

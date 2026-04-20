@@ -12,6 +12,10 @@ const navItems = [
   { label: '이용 가이드', href: '#guide' },
 ];
 
+const authNavItems = [
+  { label: '면접 이력', href: '/history' },
+];
+
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -96,6 +100,15 @@ export function Header() {
               {item.label}
             </a>
           ))}
+          {isAuthenticated && authNavItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="rounded-lg px-3.5 py-1.5 text-sm text-gray-500 transition-all hover:text-violet-700 hover:bg-violet-50"
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         {/* Auth Buttons */}
@@ -168,6 +181,16 @@ export function Header() {
               >
                 {item.label}
               </a>
+            ))}
+            {isAuthenticated && authNavItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className="rounded-lg px-3 py-2.5 text-sm text-gray-500 transition-colors hover:bg-violet-50 hover:text-violet-700"
+              >
+                {item.label}
+              </Link>
             ))}
           </nav>
           <div className="flex gap-2 pt-3 border-t border-violet-100">

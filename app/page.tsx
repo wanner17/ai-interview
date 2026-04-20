@@ -49,6 +49,14 @@ export default function Home() {
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const videoRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoChunksRef = useRef<Blob[]>([]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const compositeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const compositeRafRef = useRef<number | null>(null);
+  const activeQuestionRef = useRef<string | null>(null);
+  const startVideoRecordingCbRef = useRef<() => void>(() => {});
+  const stopAndUploadVideoCbRef = useRef<(cat: string) => Promise<void>>(() => Promise.resolve());
 
   // 이력서 업로드 관련 상태
   const [resumeStepDone, setResumeStepDone] = useState<boolean>(false);
@@ -60,6 +68,7 @@ export default function Home() {
 
   // 면접 유형 선택 상태
   const [interviewType, setInterviewType] = useState<string | null>(null);
+  const [saveVideo, setSaveVideo] = useState<boolean>(false);
   const [foreignLanguage, setForeignLanguage] = useState<string>('en-US');
   const [interviewTypeStepDone, setInterviewTypeStepDone] = useState<boolean>(false);
 
@@ -239,6 +248,11 @@ export default function Home() {
     }
   };
 
+  useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
+  useEffect(() => { activeQuestionRef.current = currentQuestion; }, [currentQuestion]);
+  useEffect(() => { if (groupCurrentQuestion) activeQuestionRef.current = groupCurrentQuestion; }, [groupCurrentQuestion]);
+  useEffect(() => { if (ptQAQuestion) activeQuestionRef.current = ptQAQuestion; }, [ptQAQuestion]);
+
   // ── 소켓 이벤트 ──────────────────────────────────────────────────────────────
   useEffect(() => {
     function onConnect() {
@@ -262,11 +276,14 @@ export default function Home() {
       }
     });
     socket.on('next_question', (data: { question: string; isEnd: boolean; isFollowup?: boolean }) => {
+      startVideoRecordingCbRef.current();
       setCurrentQuestion(data.question);
       setIsInterviewFinished(data.isEnd);
       setIsCurrentFollowup(data.isFollowup || false);
     });
-    socket.on('interview_finished', (results: any[]) => setReportData(results));
+    socket.on('interview_finished', (results: any[]) => {
+      stopAndUploadVideoCbRef.current('individual').then(() => setReportData(results));
+    });
 
     socket.on('group_room_created', (data: any) => {
       setGroupRoomCode(data.code);
@@ -284,6 +301,7 @@ export default function Home() {
     socket.on('group_room_error', (data: any) => setGroupRoomError(data.error));
     socket.on('room_list_updated', (list: any[]) => setRoomList(list));
     socket.on('group_question', (data: any) => {
+      startVideoRecordingCbRef.current();
       setGroupCurrentQuestion(data.question);
       setGroupCurrentAnswererId(data.currentAnswererId);
       setGroupAnswererOrder(data.answererOrder);
@@ -309,7 +327,9 @@ export default function Home() {
         socket.emit('stop_audio_stream');
       }
     });
-    socket.on('group_interview_finished', (data: any) => setGroupResults(data));
+    socket.on('group_interview_finished', (data: any) => {
+      stopAndUploadVideoCbRef.current('group').then(() => setGroupResults(data));
+    });
 
     socket.on('pt_presentation_feedback', (data: any) => {
       setPtPresentationFeedback(data);
@@ -331,7 +351,9 @@ export default function Home() {
       finalizedTextRef.current = '';
       analysisDataRef.current = { totalFrames: 0, lookAwayFrames: 0, mouthOpenFrames: 0 };
     });
-    socket.on('pt_finished', (results: any[]) => setPtResults(results));
+    socket.on('pt_finished', (results: any[]) => {
+      stopAndUploadVideoCbRef.current('pt').then(() => setPtResults(results));
+    });
 
     socket.on('debate_room_list_updated', (list: any[]) => setDebateRoomList(list));
     socket.on('debate_room_created', (data: any) => {
@@ -355,6 +377,7 @@ export default function Home() {
     socket.on('debate_room_updated', (data: any) => setDebateParticipants(data.room.participants));
     socket.on('debate_room_error', (data: any) => setDebateRoomError(data.error));
     socket.on('debate_started', (data: any) => {
+      startVideoRecordingCbRef.current();
       setDebateParticipants(data.room.participants);
       setDebateCurrentSpeakerId(data.currentSpeakerId);
       setDebateRoundOrder(data.room.participants);
@@ -385,7 +408,9 @@ export default function Home() {
       setDebateRoundSummary(data.summary);
       setDebateShowSummary(true);
     });
-    socket.on('debate_finished', (data: any) => setDebateResults(data));
+    socket.on('debate_finished', (data: any) => {
+      stopAndUploadVideoCbRef.current('discussion').then(() => setDebateResults(data));
+    });
 
     socket.connect();
 
@@ -696,6 +721,145 @@ export default function Home() {
     }
   };
 
+  const startVideoRecording = () => {
+    if (!saveVideo || !mediaStreamRef.current || videoRecorderRef.current) return;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    compositeCanvasRef.current = canvas;
+    const ctx = canvas.getContext('2d')!;
+
+    const drawRoundRect = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    };
+
+    const drawFrame = () => {
+      const cw = canvas.width;
+      const ch = canvas.height;
+
+      ctx.save();
+      ctx.translate(cw, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(videoEl, 0, 0, cw, ch);
+      ctx.restore();
+
+      const question = activeQuestionRef.current;
+      if (question) {
+        const text = question.replace(/^\d+\.\s*/, '');
+        ctx.font = 'bold 24px sans-serif';
+        const maxTextWidth = cw - 80;
+
+        // 텍스트 줄바꿈
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let line = '';
+        for (const word of words) {
+          const test = line + word + ' ';
+          if (ctx.measureText(test).width > maxTextWidth && line) {
+            lines.push(line.trim());
+            line = word + ' ';
+          } else {
+            line = test;
+          }
+        }
+        if (line) lines.push(line.trim());
+
+        const lineH = 32;
+        const padV = 14;
+        const boxH = lines.length * lineH + padV * 2;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        drawRoundRect(16, 16, cw - 32, boxH, 12);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        lines.forEach((l, i) => ctx.fillText(l, 36, 16 + padV + i * lineH, maxTextWidth));
+      }
+
+      compositeRafRef.current = requestAnimationFrame(drawFrame);
+    };
+    drawFrame();
+
+    const canvasStream = canvas.captureStream(30);
+    mediaStreamRef.current.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : 'video/webm';
+    videoChunksRef.current = [];
+    const recorder = new MediaRecorder(canvasStream, { mimeType });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
+    recorder.start(5000);
+    videoRecorderRef.current = recorder;
+  };
+
+  const stopAndUploadVideo = (category: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (compositeRafRef.current !== null) {
+        cancelAnimationFrame(compositeRafRef.current);
+        compositeRafRef.current = null;
+      }
+      compositeCanvasRef.current = null;
+
+      const recorder = videoRecorderRef.current;
+      if (!recorder) { resolve(); return; }
+      recorder.onstop = async () => {
+        const contentType = recorder.mimeType.split(';')[0];
+        const blob = new Blob(videoChunksRef.current, { type: contentType });
+        videoRecorderRef.current = null;
+        videoChunksRef.current = [];
+        try {
+          const presignRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001'}/videos/presign-upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contentType }),
+            credentials: 'include',
+          });
+          const { presignedUrl, key } = await presignRes.json();
+          await fetch(presignedUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
+          const categoryMap: Record<string, string> = { individual: '개인', group: '집단', pt: 'PT', discussion: '토론', foreign: '외국어' };
+          const title = `${categoryMap[category] ?? category}면접 ${new Date().toLocaleDateString('ko-KR')}`;
+          await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001'}/videos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, title, category, price: 0 }),
+            credentials: 'include',
+          });
+        } catch (e) {
+          console.error('[video] 업로드 실패:', e);
+        }
+        resolve();
+      };
+      recorder.stop();
+    });
+  };
+
+  // 콜백 ref를 매 렌더마다 최신 함수로 갱신 (소켓 클로저에서 항상 최신 버전 호출 보장)
+  useEffect(() => {
+    startVideoRecordingCbRef.current = startVideoRecording;
+    stopAndUploadVideoCbRef.current = stopAndUploadVideo;
+  });
+
+  // PT 면접: 발표 시작 시 녹화 시작
+  useEffect(() => {
+    if (ptPhase === 'presenting') startVideoRecordingCbRef.current();
+  }, [ptPhase]);
+
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
     try {
@@ -831,6 +995,8 @@ export default function Home() {
             onSelectType={setInterviewType}
             foreignLanguage={foreignLanguage}
             onSelectLanguage={setForeignLanguage}
+            saveVideo={saveVideo}
+            onToggleSaveVideo={() => setSaveVideo(v => !v)}
             onConfirm={() => setInterviewTypeStepDone(true)}
           />
         ) : interviewType === 'discussion' ? (

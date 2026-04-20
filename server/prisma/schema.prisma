@@ -20,6 +20,34 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at") @db.DateTime(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  videos       Video[]   @relation("SellerVideos")
+  purchases    Purchase[]
 
   @@map("User")
+}
+
+model Video {
+  id        String     @id @default(cuid())
+  title     String
+  category  String
+  videoUrl  String     @db.Text
+  price     Int        @default(0)
+  sellerId  String     @db.VarChar(36)
+  seller    User       @relation("SellerVideos", fields: [sellerId], references: [userId])
+  purchases Purchase[]
+  createdAt DateTime   @default(now())
+
+  @@map("Video")
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String   @db.VarChar(36)
+  videoId   String
+  user      User     @relation(fields: [userId], references: [userId])
+  video     Video    @relation(fields: [videoId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, videoId])
+  @@map("Purchase")
 }
