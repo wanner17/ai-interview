@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { type AuthUser, fetchCurrentUser, logout } from '../lib/auth';
 
 const navItems = [
   { label: '면접 시작', href: '/' },
@@ -9,7 +12,55 @@ const navItems = [
 ];
 
 export function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentUser() {
+      try {
+        const user = await fetchCurrentUser();
+        if (!cancelled) {
+          setCurrentUser(user);
+          setIsAuthenticated(Boolean(user));
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        }
+      }
+    }
+
+    loadCurrentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, searchParams]);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setMenuOpen(false);
+      router.replace('/');
+      router.refresh();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const displayName = currentUser?.nickname || currentUser?.userName || currentUser?.loginId || null;
 
   return (
     <header className="sticky top-0 z-50 w-full">
@@ -50,13 +101,42 @@ export function Header() {
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-2">
-          <button disabled title="준비 중" className="rounded-lg px-4 py-1.5 text-sm font-medium text-gray-300 cursor-not-allowed select-none">
-            로그인
-          </button>
-          <button disabled title="준비 중" className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-1.5 text-sm font-medium text-violet-300 cursor-not-allowed select-none">
-            회원가입
-            <span className="text-[10px] rounded bg-violet-100 text-violet-400 px-1.5 py-0.5 leading-none font-semibold tracking-wide">SOON</span>
-          </button>
+          {isAuthenticated ? (
+            <>
+              <div className="flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-3 py-1.5 text-sm text-gray-700 shadow-sm">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-bold text-white">
+                  {(displayName ?? '?').slice(0, 1).toUpperCase()}
+                </span>
+                <div className="leading-tight">
+                  <p className="font-semibold text-gray-800">{displayName}</p>
+                  <p className="text-[11px] text-gray-500">@{currentUser?.loginId}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-1.5 text-sm font-medium text-rose-700 transition-all hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoggingOut ? '로그아웃 중...' : '로그아웃'}
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/?auth=login"
+                className="rounded-lg px-4 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-violet-50 hover:text-violet-700"
+              >
+                로그인
+              </Link>
+              <Link
+                href="/?auth=signup"
+                className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-1.5 text-sm font-medium text-violet-700 transition-all hover:border-violet-300 hover:bg-violet-100"
+              >
+                회원가입
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -92,12 +172,39 @@ export function Header() {
             ))}
           </nav>
           <div className="flex gap-2 pt-3 border-t border-violet-100">
-            <button disabled className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-300 cursor-not-allowed">
-              로그인
-            </button>
-            <button disabled className="flex-1 rounded-lg bg-violet-50 border border-violet-200 py-2 text-sm font-medium text-violet-300 cursor-not-allowed">
-              회원가입
-            </button>
+            {isAuthenticated ? (
+              <div className="flex w-full flex-col gap-2">
+                <div className="rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-3 text-sm">
+                  <p className="font-semibold text-gray-800">{displayName}</p>
+                  <p className="text-xs text-gray-500">@{currentUser?.loginId}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex-1 rounded-lg border border-rose-200 bg-rose-50 py-2 text-center text-sm font-medium text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoggingOut ? '로그아웃 중...' : '로그아웃'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/?auth=login"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-sm font-medium text-gray-600 transition-colors hover:border-violet-200 hover:text-violet-700"
+                >
+                  로그인
+                </Link>
+                <Link
+                  href="/?auth=signup"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex-1 rounded-lg border border-violet-200 bg-violet-50 py-2 text-center text-sm font-medium text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100"
+                >
+                  회원가입
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

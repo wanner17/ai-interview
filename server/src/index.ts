@@ -7,6 +7,7 @@ import { Server } from 'socket.io';
 import { SpeechClient } from '@google-cloud/speech';
 import OpenAI from 'openai';
 import multer from 'multer';
+import { authRouter } from './routes/auth.route';
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,10 +17,12 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', clientOrigin);
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
   next();
 });
 app.use(express.json());
+app.use('/auth', authRouter);
 
 const io = new Server(httpServer, {
   cors: { origin: clientOrigin, methods: ['GET', 'POST'], credentials: true },

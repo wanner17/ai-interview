@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { socket } from './socket';
 import type { Results } from '@mediapipe/face_mesh';
 
 import { LandingPage } from './components/LandingPage';
+import { AuthPanel } from './components/auth-panel';
 import { MediaPermission } from './components/MediaPermission';
 import { ResumeUpload } from './components/ResumeUpload';
 import { InterviewTypeSelect } from './components/InterviewTypeSelect';
@@ -16,12 +18,28 @@ import { GeneralReport } from './components/results/GeneralReport';
 import { GroupReport } from './components/results/GroupReport';
 import { PTReport } from './components/results/PTReport';
 import { DebateReport } from './components/results/DebateReport';
+import { loginWithPassword, signUpWithPassword } from './lib/auth';
 
 const API_BASE = '';
 
 export default function Home() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const authParam = searchParams.get('auth');
+  const authView = authParam === 'login' || authParam === 'signup' ? authParam : null;
+
   const [landingDone, setLandingDone] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [identifier, setIdentifier] = useState('');
+  const [loginId, setLoginId] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [userName, setUserName] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
 
   // 미디어 제어용 상태
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -146,6 +164,80 @@ export default function Home() {
   });
   const finalizedTextRef = useRef<string>('');
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const updateAuthRoute = (nextView: 'login' | 'signup' | null) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextView) {
+      nextParams.set('auth', nextView);
+    } else {
+      nextParams.delete('auth');
+    }
+
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  };
+
+  const handleAuthViewChange = (nextView: 'login' | 'signup') => {
+    setAuthError(null);
+    setAuthMessage(null);
+    setPassword('');
+    updateAuthRoute(nextView);
+  };
+
+  const handleAuthSubmit = async () => {
+    setAuthError(null);
+    setAuthMessage(null);
+
+    if (!authView) {
+      return;
+    }
+
+    if (authView === 'login') {
+      if (!identifier.trim() || !password.trim()) {
+        setAuthError('아이디 또는 이메일과 비밀번호를 입력해주세요.');
+        return;
+      }
+    } else {
+      if (!loginId.trim() || !email.trim() || !nickname.trim() || !password.trim()) {
+        setAuthError('아이디, 이메일, 닉네임, 비밀번호는 필수입니다.');
+        return;
+      }
+    }
+
+    setIsSubmittingAuth(true);
+
+    try {
+      if (authView === 'login') {
+        const result = await loginWithPassword({
+          identifier: identifier.trim(),
+          password,
+        });
+
+        setAuthMessage(result.message);
+        setPassword('');
+        updateAuthRoute(null);
+      } else {
+        const result = await signUpWithPassword({
+          loginId: loginId.trim(),
+          email: email.trim(),
+          password,
+          nickname: nickname.trim(),
+          userName: userName.trim() || undefined,
+        });
+
+        setAuthMessage(result.message);
+        setIdentifier(loginId.trim());
+        setPassword('');
+        updateAuthRoute(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '인증 처리 중 오류가 발생했습니다.';
+      setAuthError(message);
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
 
   // ── 소켓 이벤트 ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -667,6 +759,31 @@ export default function Home() {
   if (reportData) return <GeneralReport reportData={reportData} reportRef={reportRef} onDownloadPdf={handleDownloadPdf} />;
 
   // ── 랜딩 화면 ────────────────────────────────────────────────────────────────
+  if (authView) {
+    return (
+      <AuthPanel
+        view={authView}
+        identifier={identifier}
+        loginId={loginId}
+        email={email}
+        password={password}
+        nickname={nickname}
+        userName={userName}
+        isSubmitting={isSubmittingAuth}
+        authError={authError}
+        authMessage={authMessage}
+        onViewChange={handleAuthViewChange}
+        onIdentifierChange={setIdentifier}
+        onLoginIdChange={setLoginId}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onNicknameChange={setNickname}
+        onUserNameChange={setUserName}
+        onSubmit={handleAuthSubmit}
+      />
+    );
+  }
+
   if (!landingDone) {
     return <LandingPage onStart={() => setLandingDone(true)} />;
   }
