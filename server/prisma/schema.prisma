@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model TbUser {
+model User {
   userId       String    @id @map("user_id") @db.Char(36)
   loginId      String    @unique @map("login_id") @db.VarChar(50)
   email        String    @unique @db.VarChar(191)

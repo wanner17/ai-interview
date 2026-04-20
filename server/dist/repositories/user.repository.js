@@ -4,28 +4,28 @@ exports.userRepository = void 0;
 const prisma_1 = require("../lib/prisma");
 class UserRepository {
     async findByEmail(email) {
-        return prisma_1.prisma.tbUser.findUnique({
+        return prisma_1.prisma.user.findUnique({
             where: {
                 email: email.toLowerCase(),
             },
         });
     }
     async findByNickname(nickname) {
-        return prisma_1.prisma.tbUser.findUnique({
+        return prisma_1.prisma.user.findUnique({
             where: {
                 nickname,
             },
         });
     }
     async findByLoginId(loginId) {
-        return prisma_1.prisma.tbUser.findUnique({
+        return prisma_1.prisma.user.findUnique({
             where: {
                 loginId: loginId.toLowerCase(),
             },
         });
     }
     async findById(userId) {
-        return prisma_1.prisma.tbUser.findUnique({
+        return prisma_1.prisma.user.findUnique({
             where: {
                 userId,
             },
@@ -33,19 +33,19 @@ class UserRepository {
     }
     async findByIdentifier(identifier) {
         const normalized = identifier.trim().toLowerCase();
-        return prisma_1.prisma.tbUser.findFirst({
+        return prisma_1.prisma.user.findFirst({
             where: {
                 OR: [{ loginId: normalized }, { email: normalized }],
             },
         });
     }
     async createUser(data) {
-        return prisma_1.prisma.tbUser.create({
+        return prisma_1.prisma.user.create({
             data,
         });
     }
     async updateLastLoginAt(userId) {
-        return prisma_1.prisma.tbUser.update({
+        return prisma_1.prisma.user.update({
             where: {
                 userId,
             },

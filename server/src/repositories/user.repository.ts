@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 
 class UserRepository {
   async findByEmail(email: string) {
-    return prisma.tbUser.findUnique({
+    return prisma.user.findUnique({
       where: {
         email: email.toLowerCase(),
       },
@@ -10,7 +10,7 @@ class UserRepository {
   }
 
   async findByNickname(nickname: string) {
-    return prisma.tbUser.findUnique({
+    return prisma.user.findUnique({
       where: {
         nickname,
       },
@@ -18,7 +18,7 @@ class UserRepository {
   }
 
   async findByLoginId(loginId: string) {
-    return prisma.tbUser.findUnique({
+    return prisma.user.findUnique({
       where: {
         loginId: loginId.toLowerCase(),
       },
@@ -26,7 +26,7 @@ class UserRepository {
   }
 
   async findById(userId: string) {
-    return prisma.tbUser.findUnique({
+    return prisma.user.findUnique({
       where: {
         userId,
       },
@@ -35,7 +35,7 @@ class UserRepository {
 
   async findByIdentifier(identifier: string) {
     const normalized = identifier.trim().toLowerCase();
-    return prisma.tbUser.findFirst({
+    return prisma.user.findFirst({
       where: {
         OR: [{ loginId: normalized }, { email: normalized }],
       },
@@ -53,13 +53,13 @@ class UserRepository {
     userRole: string;
     userStatus: string;
   }) {
-    return prisma.tbUser.create({
+    return prisma.user.create({
       data,
     });
   }
 
   async updateLastLoginAt(userId: string) {
-    return prisma.tbUser.update({
+    return prisma.user.update({
       where: {
         userId,
       },
