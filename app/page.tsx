@@ -17,7 +17,7 @@ import { GroupReport } from './components/results/GroupReport';
 import { PTReport } from './components/results/PTReport';
 import { DebateReport } from './components/results/DebateReport';
 
-const API_BASE = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+const API_BASE = '';
 
 export default function Home() {
   const [landingDone, setLandingDone] = useState(false);
