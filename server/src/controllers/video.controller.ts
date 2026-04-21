@@ -81,16 +81,16 @@ class VideoController {
         v.description,
         v.hashtags,
         v.category,
-        v.video_url AS videoUrl,
+        v.videoUrl AS videoUrl,
         v.price,
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
-        v.seller_id AS sellerId,
+        v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt
       FROM Video v
-      WHERE v.id = ${id} AND v.seller_id = ${userId}
+      WHERE v.id = ${id} AND v.sellerId = ${userId}
       LIMIT 1
     `);
 
@@ -167,7 +167,7 @@ class VideoController {
               ? voicePitch
               : existing.voicePitch
           }
-        WHERE id = ${id} AND seller_id = ${session.userId}
+        WHERE id = ${id} AND sellerId = ${session.userId}
       `,
     );
 
@@ -186,18 +186,18 @@ class VideoController {
         v.description,
         v.hashtags,
         v.category,
-        v.video_url AS videoUrl,
+        v.videoUrl AS videoUrl,
         v.price,
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
-        v.seller_id AS sellerId,
+        v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt,
         u.user_id AS sellerUserId,
         u.nickname AS sellerNickname
       FROM Video v
-      JOIN User u ON u.user_id = v.seller_id
+      JOIN User u ON u.user_id = v.sellerId
       WHERE v.is_listed = true
         AND (${category ?? null} IS NULL OR v.category = ${category ?? null})
         AND (
@@ -229,18 +229,18 @@ class VideoController {
         v.description,
         v.hashtags,
         v.category,
-        v.video_url AS videoUrl,
+        v.videoUrl AS videoUrl,
         v.price,
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
-        v.seller_id AS sellerId,
+        v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt,
         u.user_id AS sellerUserId,
         u.nickname AS sellerNickname
       FROM Video v
-      JOIN User u ON u.user_id = v.seller_id
+      JOIN User u ON u.user_id = v.sellerId
       WHERE v.id = ${id} AND v.is_listed = true
       LIMIT 1
     `);
@@ -277,12 +277,12 @@ class VideoController {
         v.description,
         v.hashtags,
         v.category,
-        v.video_url AS videoUrl,
+        v.videoUrl AS videoUrl,
         v.price,
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
-        v.seller_id AS sellerId,
+        v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt
       FROM Video v
@@ -306,7 +306,7 @@ class VideoController {
     if (price === 0) {
       await prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, user_id, video_id, price_paid, platform_fee, createdAt)
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, createdAt)
           VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, NOW())
         `,
       );
@@ -327,7 +327,7 @@ class VideoController {
       // Purchase 기록
       prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, user_id, video_id, price_paid, platform_fee, createdAt)
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, createdAt)
           VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, NOW())
         `,
       ),
@@ -365,8 +365,8 @@ class VideoController {
     const purchases = await prisma.$queryRaw<PurchaseRow[]>(Prisma.sql`
       SELECT
         p.id,
-        p.user_id AS userId,
-        p.video_id AS videoId,
+        p.userId AS userId,
+        p.videoId AS videoId,
         p.price_paid AS pricePaid,
         p.platform_fee AS platformFee,
         p.createdAt,
@@ -376,9 +376,9 @@ class VideoController {
         v.voice_pitch AS videoVoicePitch,
         u.nickname AS sellerNickname
       FROM Purchase p
-      JOIN Video v ON v.id = p.video_id
-      JOIN User u ON u.user_id = v.seller_id
-      WHERE p.user_id = ${session.userId}
+      JOIN Video v ON v.id = p.videoId
+      JOIN User u ON u.user_id = v.sellerId
+      WHERE p.userId = ${session.userId}
       ORDER BY p.createdAt DESC
     `);
 
@@ -419,16 +419,16 @@ class VideoController {
         v.description,
         v.hashtags,
         v.category,
-        v.video_url AS videoUrl,
+        v.videoUrl AS videoUrl,
         v.price,
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
-        v.seller_id AS sellerId,
+        v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt
       FROM Video v
-      WHERE v.seller_id = ${session.userId}
+      WHERE v.sellerId = ${session.userId}
       ORDER BY v.createdAt DESC
     `);
     return res.json({ ok: true, videos: rows.map(normalizeVideo) });

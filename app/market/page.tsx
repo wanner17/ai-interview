@@ -35,6 +35,7 @@ export default function MarketPage() {
   const router = useRouter();
   const [videos, setVideos] = useState<MarketVideo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState('전체');
   const [query, setQuery] = useState('');
   const [inputVal, setInputVal] = useState('');
@@ -42,14 +43,24 @@ export default function MarketPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const qs = new URLSearchParams();
-      if (category !== '전체') qs.set('category', category);
-      if (query) qs.set('q', query);
-      const res = await fetch(`/api/market?${qs.toString()}`, { credentials: 'include' });
-      if (res.status === 401) { router.replace('/?auth=login'); return; }
-      const data = await res.json();
-      if (data.ok) setVideos(data.videos);
-      setLoading(false);
+      setError(null);
+      try {
+        const qs = new URLSearchParams();
+        if (category !== '전체') qs.set('category', category);
+        if (query) qs.set('q', query);
+        const res = await fetch(`/api/market?${qs.toString()}`, { credentials: 'include' });
+        if (res.status === 401) { router.replace('/?auth=login'); return; }
+        const data = await res.json();
+        if (!data.ok) {
+          throw new Error(data.error || '마켓 목록을 불러오지 못했습니다.');
+        }
+        setVideos(data.videos);
+      } catch (error) {
+        setVideos([]);
+        setError(error instanceof Error ? error.message : '마켓 목록을 불러오지 못했습니다.');
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [category, query, router]);
@@ -110,6 +121,10 @@ export default function MarketPage() {
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600"/>
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          {error}
         </div>
       ) : videos.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 py-20 text-center">
