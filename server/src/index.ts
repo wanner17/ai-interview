@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });
 
 import express from 'express';
 import { createServer } from 'http';
@@ -8,6 +10,7 @@ import { SpeechClient } from '@google-cloud/speech';
 import OpenAI from 'openai';
 import multer from 'multer';
 import { authRouter } from './routes/auth.route';
+import { billingRouter } from './routes/billing.route';
 
 const app = express();
 const httpServer = createServer(app);
@@ -23,6 +26,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use('/auth', authRouter);
+app.use('/billing', billingRouter);
 
 const io = new Server(httpServer, {
   cors: { origin: clientOrigin, methods: ['GET', 'POST'], credentials: true },

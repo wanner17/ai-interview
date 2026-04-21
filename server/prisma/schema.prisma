@@ -20,6 +20,55 @@ model User {
   lastLoginAt  DateTime? @map("last_login_at") @db.DateTime(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  paymentOrders      PaymentOrder[]
+  tokenTransactions  TokenTransaction[]
 
   @@map("User")
+}
+
+model PaymentOrder {
+  paymentOrderId   String    @id @default(uuid()) @map("payment_order_id") @db.Char(36)
+  orderId          String    @unique @map("order_id") @db.VarChar(64)
+  userId           String    @map("user_id") @db.Char(36)
+  provider         String    @db.VarChar(30)
+  orderType        String    @map("order_type") @db.VarChar(30)
+  status           String    @db.VarChar(30)
+  orderName        String    @map("order_name") @db.VarChar(191)
+  amountKrw        Int       @map("amount_krw")
+  tokenAmount      Int       @map("token_amount")
+  paymentKey       String?   @unique @map("payment_key") @db.VarChar(200)
+  method           String?   @db.VarChar(50)
+  approvedAt       DateTime? @map("approved_at") @db.DateTime(3)
+  requestedAt      DateTime  @default(now()) @map("requested_at") @db.DateTime(3)
+  failedAt         DateTime? @map("failed_at") @db.DateTime(3)
+  canceledAt       DateTime? @map("canceled_at") @db.DateTime(3)
+  failureCode      String?   @map("failure_code") @db.VarChar(100)
+  failureMessage   String?   @map("failure_message") @db.VarChar(500)
+  lastWebhookEvent String?   @map("last_webhook_event") @db.VarChar(100)
+  rawPayload       Json?     @map("raw_payload")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [userId])
+  tokenTransactions TokenTransaction[]
+
+  @@index([userId, status])
+  @@map("PaymentOrder")
+}
+
+model TokenTransaction {
+  tokenTransactionId String   @id @default(uuid()) @map("token_transaction_id") @db.Char(36)
+  userId             String   @map("user_id") @db.Char(36)
+  paymentOrderId     String?  @map("payment_order_id") @db.Char(36)
+  transactionType    String   @map("transaction_type") @db.VarChar(30)
+  amount             Int
+  balanceAfter       Int      @map("balance_after")
+  description        String?  @db.VarChar(191)
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [userId])
+  paymentOrder PaymentOrder? @relation(fields: [paymentOrderId], references: [paymentOrderId])
+
+  @@index([userId, createdAt])
+  @@map("TokenTransaction")
 }

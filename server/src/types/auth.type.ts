@@ -17,6 +17,7 @@ export type SafeUser = {
   email: string | null;
   nickname: string;
   userName: string | null;
+  tokens: number;
   userRole: string;
   userStatus: string;
   lastLoginAt: string | null;
