@@ -40,11 +40,12 @@ class VideoController {
       return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
     }
 
-    const { key, title, category, price } = req.body as {
+    const { key, title, category, price, feedbackData } = req.body as {
       key: string;
       title: string;
       category: string;
       price: number;
+      feedbackData?: any;
     };
 
     if (!key || !title || !category || price == null) {
@@ -60,6 +61,7 @@ class VideoController {
         videoUrl,
         price: Number(price),
         sellerId: session.userId,
+        feedbackData: feedbackData ?? undefined,
       },
     });
 
@@ -86,6 +88,25 @@ class VideoController {
       orderBy: { createdAt: 'desc' },
     });
     return res.json({ ok: true, videos });
+  };
+
+  getOne = async (req: Request, res: Response) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
+    if (!session) {
+      return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+    }
+
+    const { id } = req.params;
+    const video = await prisma.video.findFirst({
+      where: { id, sellerId: session.userId },
+    });
+
+    if (!video) {
+      return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
+    }
+
+    return res.json({ ok: true, video });
   };
 }
 

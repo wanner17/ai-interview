@@ -238,7 +238,7 @@ async function generateFeedback(
   const langName = LANGUAGE_NAMES[language] || language;
   const prompt = language === 'ko-KR'
     ? `당신은 매우 엄격한 대기업 수석 면접관입니다. 날카롭고 객관적인 피드백을 제공하세요.\nJSON: {"score":정수(0~100),"good":"긍정 평가 1줄","bad":"개선점 1줄"}\n\n질문: ${question}${isFollowup ? ' [꼬리질문]' : ''}\n답변: ${answer}\n시선집중도: ${focusScore}%`
-    : `You are a strict senior interviewer evaluating a ${langName} interview. Analyze content, grammar, vocabulary, fluency.\nJSON: {"score":int(0-100),"good":"one positive","bad":"one improvement"}\n\nQuestion: ${question}${isFollowup ? ' [Follow-up]' : ''}\nAnswer: ${answer}\nEye contact: ${focusScore}%`;
+    : `당신은 엄격한 ${langName} 면접관입니다. 지원자의 ${langName} 답변을 평가하세요. 문법, 어휘, 유창성, 내용을 분석하고 반드시 한국어로 피드백을 작성하세요.\nJSON: {"score":정수(0~100),"good":"긍정 평가 1줄 (한국어)","bad":"개선점 1줄 (한국어)"}\n\n질문: ${question}${isFollowup ? ' [꼬리질문]' : ''}\n답변: ${answer}\n시선집중도: ${focusScore}%`;
   const completion = await openai.chat.completions.create({
     messages: [{ role: 'user', content: prompt }], model: 'gpt-3.5-turbo', response_format: { type: 'json_object' },
   });

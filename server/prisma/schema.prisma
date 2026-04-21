@@ -27,15 +27,16 @@ model User {
 }
 
 model Video {
-  id        String     @id @default(cuid())
-  title     String
-  category  String
-  videoUrl  String     @db.Text
-  price     Int        @default(0)
-  sellerId  String     @db.VarChar(36)
-  seller    User       @relation("SellerVideos", fields: [sellerId], references: [userId])
-  purchases Purchase[]
-  createdAt DateTime   @default(now())
+  id           String     @id @default(cuid())
+  title        String
+  category     String
+  videoUrl     String     @db.Text
+  price        Int        @default(0)
+  sellerId     String     @db.VarChar(36)
+  seller       User       @relation("SellerVideos", fields: [sellerId], references: [userId])
+  purchases    Purchase[]
+  feedbackData Json?      @map("feedback_data")
+  createdAt    DateTime   @default(now())
 
   @@map("Video")
 }

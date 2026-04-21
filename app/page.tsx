@@ -56,7 +56,8 @@ export default function Home() {
   const compositeRafRef = useRef<number | null>(null);
   const activeQuestionRef = useRef<string | null>(null);
   const startVideoRecordingCbRef = useRef<() => void>(() => {});
-  const stopAndUploadVideoCbRef = useRef<(cat: string) => Promise<void>>(() => Promise.resolve());
+  const stopAndUploadVideoCbRef = useRef<(cat: string, feedbackData?: any) => Promise<void>>(() => Promise.resolve());
+  const interviewTypeRef = useRef<string>('individual');
 
   // 이력서 업로드 관련 상태
   const [resumeStepDone, setResumeStepDone] = useState<boolean>(false);
@@ -249,6 +250,7 @@ export default function Home() {
   };
 
   useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
+  useEffect(() => { interviewTypeRef.current = interviewType || 'individual'; }, [interviewType]);
   useEffect(() => { activeQuestionRef.current = currentQuestion; }, [currentQuestion]);
   useEffect(() => { if (groupCurrentQuestion) activeQuestionRef.current = groupCurrentQuestion; }, [groupCurrentQuestion]);
   useEffect(() => { if (ptQAQuestion) activeQuestionRef.current = ptQAQuestion; }, [ptQAQuestion]);
@@ -282,7 +284,7 @@ export default function Home() {
       setIsCurrentFollowup(data.isFollowup || false);
     });
     socket.on('interview_finished', (results: any[]) => {
-      stopAndUploadVideoCbRef.current('individual').then(() => setReportData(results));
+      stopAndUploadVideoCbRef.current(interviewTypeRef.current, results).then(() => setReportData(results));
     });
 
     socket.on('group_room_created', (data: any) => {
@@ -328,7 +330,7 @@ export default function Home() {
       }
     });
     socket.on('group_interview_finished', (data: any) => {
-      stopAndUploadVideoCbRef.current('group').then(() => setGroupResults(data));
+      stopAndUploadVideoCbRef.current('group', { ...data, mySocketId: socket.id }).then(() => setGroupResults(data));
     });
 
     socket.on('pt_presentation_feedback', (data: any) => {
@@ -352,7 +354,7 @@ export default function Home() {
       analysisDataRef.current = { totalFrames: 0, lookAwayFrames: 0, mouthOpenFrames: 0 };
     });
     socket.on('pt_finished', (results: any[]) => {
-      stopAndUploadVideoCbRef.current('pt').then(() => setPtResults(results));
+      stopAndUploadVideoCbRef.current('pt', results).then(() => setPtResults(results));
     });
 
     socket.on('debate_room_list_updated', (list: any[]) => setDebateRoomList(list));
@@ -377,7 +379,6 @@ export default function Home() {
     socket.on('debate_room_updated', (data: any) => setDebateParticipants(data.room.participants));
     socket.on('debate_room_error', (data: any) => setDebateRoomError(data.error));
     socket.on('debate_started', (data: any) => {
-      startVideoRecordingCbRef.current();
       setDebateParticipants(data.room.participants);
       setDebateCurrentSpeakerId(data.currentSpeakerId);
       setDebateRoundOrder(data.room.participants);
@@ -409,7 +410,7 @@ export default function Home() {
       setDebateShowSummary(true);
     });
     socket.on('debate_finished', (data: any) => {
-      stopAndUploadVideoCbRef.current('discussion').then(() => setDebateResults(data));
+      stopAndUploadVideoCbRef.current('discussion', { ...data, mySocketId: socket.id }).then(() => setDebateResults(data));
     });
 
     socket.connect();
@@ -808,7 +809,7 @@ export default function Home() {
     videoRecorderRef.current = recorder;
   };
 
-  const stopAndUploadVideo = (category: string): Promise<void> => {
+  const stopAndUploadVideo = (category: string, feedbackData?: any): Promise<void> => {
     return new Promise((resolve) => {
       if (compositeRafRef.current !== null) {
         cancelAnimationFrame(compositeRafRef.current);
@@ -833,11 +834,12 @@ export default function Home() {
           const { presignedUrl, key } = await presignRes.json();
           await fetch(presignedUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } });
           const categoryMap: Record<string, string> = { individual: '개인', group: '집단', pt: 'PT', discussion: '토론', foreign: '외국어' };
-          const title = `${categoryMap[category] ?? category}면접 ${new Date().toLocaleDateString('ko-KR')}`;
+          const korCategory = categoryMap[category] ?? category;
+          const title = `${korCategory}면접 ${new Date().toLocaleDateString('ko-KR')}`;
           await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001'}/videos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, title, category, price: 0 }),
+            body: JSON.stringify({ key, title, category: korCategory, price: 0, feedbackData }),
             credentials: 'include',
           });
         } catch (e) {
@@ -859,6 +861,11 @@ export default function Home() {
   useEffect(() => {
     if (ptPhase === 'presenting') startVideoRecordingCbRef.current();
   }, [ptPhase]);
+
+  // 토론 면접: debating 단계 진입 후 녹화 시작 (video 엘리먼트가 마운트된 뒤 호출)
+  useEffect(() => {
+    if (debateSetupStep === 'debating') startVideoRecordingCbRef.current();
+  }, [debateSetupStep]);
 
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
@@ -998,6 +1005,7 @@ export default function Home() {
             saveVideo={saveVideo}
             onToggleSaveVideo={() => setSaveVideo(v => !v)}
             onConfirm={() => setInterviewTypeStepDone(true)}
+            onBack={() => setResumeStepDone(false)}
           />
         ) : interviewType === 'discussion' ? (
           <DebateInterview

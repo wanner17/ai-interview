@@ -6,6 +6,7 @@ interface InterviewTypeSelectProps {
   saveVideo: boolean;
   onToggleSaveVideo: () => void;
   onConfirm: () => void;
+  onBack: () => void;
 }
 
 const types = [
@@ -22,10 +23,19 @@ const languages = [
   { code: 'zh-CN', flag: '🇨🇳', label: '中文' },
 ];
 
-export function InterviewTypeSelect({ interviewType, onSelectType, foreignLanguage, onSelectLanguage, saveVideo, onToggleSaveVideo, onConfirm }: InterviewTypeSelectProps) {
+export function InterviewTypeSelect({ interviewType, onSelectType, foreignLanguage, onSelectLanguage, saveVideo, onToggleSaveVideo, onConfirm, onBack }: InterviewTypeSelectProps) {
   return (
     <div className="flex flex-col gap-8 py-8">
-      <div className="text-center">
+      <div className="relative text-center">
+        <button
+          onClick={onBack}
+          className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          이전
+        </button>
         <h2 className="text-4xl font-black tracking-tight mb-3 text-gray-900">어떤 면접을 준비하시나요?</h2>
         <p className="text-gray-400">유형을 선택하면 맞춤 면접 환경이 구성됩니다</p>
       </div>

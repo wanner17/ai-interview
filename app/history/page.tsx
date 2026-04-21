@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -10,14 +10,6 @@ type InterviewVideo = {
   category: string;
   videoUrl: string;
   createdAt: string;
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  개인: '개인 면접',
-  집단: '집단 면접',
-  PT: 'PT 면접',
-  토론: '토론 면접',
-  외국어: '외국어 면접',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -44,8 +36,6 @@ export default function HistoryPage() {
   const [videos, setVideos] = useState<InterviewVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -107,53 +97,39 @@ export default function HistoryPage() {
       {!loading && !error && videos.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {videos.map((v) => (
-            <div
+            <Link
               key={v.id}
+              href={`/history/${v.id}`}
               className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
             >
-              {/* Video thumbnail / player */}
+              {/* Video thumbnail */}
               <div className="relative aspect-video bg-gray-900">
-                {activeVideo === v.id ? (
-                  <video
-                    ref={videoRef}
-                    src={v.videoUrl}
-                    controls
-                    autoPlay
-                    className="h-full w-full object-contain"
-                    onEnded={() => setActiveVideo(null)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="absolute inset-0 flex items-center justify-center"
-                    onClick={() => setActiveVideo(v.id)}
-                  >
-                    <video
-                      src={`${v.videoUrl}#t=0.1`}
-                      className="h-full w-full object-contain opacity-60"
-                      preload="metadata"
-                      muted
-                    />
-                    <span className="absolute flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
-                      <svg className="h-6 w-6 translate-x-0.5 text-violet-600" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </span>
-                  </button>
-                )}
+                <video
+                  src={`${v.videoUrl}#t=0.1`}
+                  className="h-full w-full object-contain opacity-60"
+                  preload="metadata"
+                  muted
+                />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
+                    <svg className="h-6 w-6 translate-x-0.5 text-violet-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                </span>
               </div>
 
               {/* Meta */}
               <div className="flex flex-1 flex-col gap-1.5 p-4">
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORY_COLORS[v.category] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {CATEGORY_LABELS[v.category] ?? v.category}
+                    {v.category}면접
                   </span>
                 </div>
                 <p className="line-clamp-2 text-sm font-medium text-gray-800">{v.title}</p>
                 <p className="mt-auto pt-1 text-xs text-gray-400">{formatDate(v.createdAt)}</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

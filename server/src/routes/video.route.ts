@@ -6,6 +6,7 @@ const videoRouter = Router();
 videoRouter.post('/presign-upload', videoController.presignUpload);
 videoRouter.post('/', videoController.create);
 videoRouter.get('/my', videoController.myList);
+videoRouter.get('/:id', videoController.getOne);
 videoRouter.get('/', videoController.list);
 
 export { videoRouter };
