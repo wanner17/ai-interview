@@ -49,7 +49,7 @@ const DEFAULT_QUESTIONS = [
 ];
 
 const LANGUAGE_NAMES: Record<string, string> = {
-  'ko-KR': '한국어', 'en-US': 'English', 'ja-JP': '日本語', 'zh-CN': '中文',
+  'ko-KR': '한국어', 'en-US': 'English', 'ja-JP': '일본어', 'zh-CN': '중국어',
 };
 
 // ── 집단면접 방 관리 ─────────────────────────────────────────────────────────

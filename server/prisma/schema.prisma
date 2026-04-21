@@ -30,9 +30,14 @@ model User {
 model Video {
   id           String     @id @default(cuid())
   title        String
+  description  String?    @db.Text
+  hashtags     String?    @db.VarChar(500)
   category     String
   videoUrl     String     @db.Text
   price        Int        @default(0)
+  isListed     Boolean    @default(false) @map("is_listed")
+  blurMode     String     @default("none") @map("blur_mode") @db.VarChar(20)
+  voicePitch   String     @default("normal") @map("voice_pitch") @db.VarChar(20)
   sellerId     String     @db.VarChar(36)
   seller       User       @relation("SellerVideos", fields: [sellerId], references: [userId])
   purchases    Purchase[]
@@ -43,12 +48,14 @@ model Video {
 }
 
 model Purchase {
-  id        String   @id @default(cuid())
-  userId    String   @db.VarChar(36)
-  videoId   String
-  user      User     @relation(fields: [userId], references: [userId])
-  video     Video    @relation(fields: [videoId], references: [id])
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String   @db.VarChar(36)
+  videoId     String
+  pricePaid   Int      @default(0) @map("price_paid")
+  platformFee Int      @default(0) @map("platform_fee")
+  user        User     @relation(fields: [userId], references: [userId])
+  video       Video    @relation(fields: [videoId], references: [id])
+  createdAt   DateTime @default(now())
 
   @@unique([userId, videoId])
   @@map("Purchase")

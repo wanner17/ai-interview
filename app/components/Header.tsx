@@ -13,6 +13,7 @@ const navItems = [
 ];
 
 const authNavItems = [
+  { label: '면접 마켓', href: '/market' },
   { label: '면접 이력', href: '/history' },
 ];
 
