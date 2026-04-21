@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -22,9 +22,11 @@ export function Header() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +53,36 @@ export function Header() {
     };
   }, [pathname, searchParams]);
 
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (!userMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [userMenuOpen]);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
 
@@ -59,6 +91,7 @@ export function Header() {
       setCurrentUser(null);
       setIsAuthenticated(false);
       setMenuOpen(false);
+      setUserMenuOpen(false);
       router.replace('/');
       router.refresh();
     } finally {
@@ -115,34 +148,70 @@ export function Header() {
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
-            <>
-              <Link
-                href="/charge"
-                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700 transition-all hover:border-amber-300 hover:bg-amber-100"
-              >
-                충전하기
-              </Link>
-              <div className="rounded-full border border-amber-100 bg-amber-50/70 px-3 py-1.5 text-sm font-semibold text-amber-700">
-                토큰 {currentUser?.tokens?.toLocaleString() ?? 0}
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-3 py-1.5 text-sm text-gray-700 shadow-sm">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-bold text-white">
-                  {(displayName ?? '?').slice(0, 1).toUpperCase()}
-                </span>
-                <div className="leading-tight">
-                  <p className="font-semibold text-gray-800">{displayName}</p>
-                  <p className="text-[11px] text-gray-500">@{currentUser?.loginId}</p>
-                </div>
-              </div>
+            <div className="relative" ref={userMenuRef}>
               <button
                 type="button"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-1.5 text-sm font-medium text-rose-700 transition-all hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setUserMenuOpen((open) => !open)}
+                className="flex items-center gap-2 rounded-full border border-violet-100 bg-white/90 px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-all hover:border-violet-200 hover:bg-violet-50"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
               >
-                {isLoggingOut ? '로그아웃 중...' : '로그아웃'}
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-bold text-white">
+                  {(displayName ?? '?').slice(0, 1).toUpperCase()}
+                </span>
+                <div className="leading-tight text-left">
+                  <p className="font-semibold text-gray-800">{displayName}</p>
+                  <p className="text-[11px] text-gray-500">회원정보</p>
+                </div>
+                <svg
+                  className={`h-4 w-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-            </>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-[calc(100%+10px)] w-64 overflow-hidden rounded-2xl border border-violet-100 bg-white/95 shadow-xl shadow-violet-100 backdrop-blur-xl">
+                  <div className="p-2">
+                    <Link
+                      href="/mypage"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-gray-700 transition-colors hover:bg-violet-50 hover:text-violet-700"
+                    >
+                      <span>마이페이지</span>
+                      <span className="text-xs text-gray-400">내 활동 보기</span>
+                    </Link>
+                    <Link
+                      href="/charge"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="mt-1 flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-amber-700 transition-colors hover:bg-amber-50"
+                    >
+                      <span>충전하기</span>
+                      <span className="text-xs text-amber-500">토큰 충전</span>
+                    </Link>
+                    <div className="mt-1 flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5 text-sm">
+                      <span className="font-medium text-gray-700">보유 토큰</span>
+                      <span className="font-semibold text-amber-700">
+                        {currentUser?.tokens?.toLocaleString() ?? 0}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className="mt-1 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span>로그아웃</span>
+                      {isLoggingOut ? <span className="text-xs text-rose-400">처리 중</span> : null}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link
