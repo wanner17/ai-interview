@@ -11,16 +11,16 @@ interface InterviewTypeSelectProps {
 
 const types = [
   { id: 'individual', icon: '🧑‍💼', label: '개인 면접', sub: '1:1 AI 면접관', desc: '이력서 기반 심층 질문 + 압박 꼬리 질문', selectedBg: 'bg-blue-50', selectedBorder: 'border-blue-300', checkBg: 'bg-blue-500', subColor: 'text-blue-500' },
-  { id: 'foreign',    icon: '🌏', label: '외국어 면접', sub: 'English · 日本語 · 中文', desc: '영어·일본어·중국어 면접 유창성 분석', selectedBg: 'bg-violet-50', selectedBorder: 'border-violet-300', checkBg: 'bg-violet-500', subColor: 'text-violet-500' },
+  { id: 'foreign',    icon: '🌏', label: '외국어 면접', sub: '영어 · 일본어 · 중국어', desc: '영어·일본어·중국어 면접 유창성 분석', selectedBg: 'bg-violet-50', selectedBorder: 'border-violet-300', checkBg: 'bg-violet-500', subColor: 'text-violet-500' },
   { id: 'pt',         icon: '📊', label: 'PT 면접', sub: 'Presentation', desc: 'AI 주제 생성 + 5분 발표 + Q&A 2문항', selectedBg: 'bg-amber-50', selectedBorder: 'border-amber-300', checkBg: 'bg-amber-500', subColor: 'text-amber-500' },
   { id: 'group',      icon: '👥', label: '집단 면접', sub: '최대 8명 동시 참여', desc: '방 코드로 입장, 공통 질문 순번 배정', selectedBg: 'bg-emerald-50', selectedBorder: 'border-emerald-300', checkBg: 'bg-emerald-500', subColor: 'text-emerald-500' },
   { id: 'discussion', icon: '⚖️', label: '토론 면접', sub: '찬반 · 자유 토론', desc: 'AI 사회자 + 라운드별 발언 분석', selectedBg: 'bg-rose-50', selectedBorder: 'border-rose-300', checkBg: 'bg-rose-500', subColor: 'text-rose-500' },
 ];
 
 const languages = [
-  { code: 'en-US', flag: '🇺🇸', label: 'English' },
-  { code: 'ja-JP', flag: '🇯🇵', label: '日本語' },
-  { code: 'zh-CN', flag: '🇨🇳', label: '中文' },
+  { code: 'en-US', flag: '🇺🇸', label: '영어' },
+  { code: 'ja-JP', flag: '🇯🇵', label: '일본어' },
+  { code: 'zh-CN', flag: '🇨🇳', label: '중국어' },
 ];
 
 export function InterviewTypeSelect({ interviewType, onSelectType, foreignLanguage, onSelectLanguage, saveVideo, onToggleSaveVideo, onConfirm, onBack }: InterviewTypeSelectProps) {
