@@ -75,6 +75,7 @@ class UserRepository {
     email: string | null;
     nickname: string;
     userName: string | null;
+    tokens: number;
     userRole: string;
     userStatus: string;
     lastLoginAt: Date | null;
@@ -87,6 +88,7 @@ class UserRepository {
       email: user.email,
       nickname: user.nickname,
       userName: user.userName,
+      tokens: user.tokens,
       userRole: user.userRole,
       userStatus: user.userStatus,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
