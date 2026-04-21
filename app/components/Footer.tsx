@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export function Footer() {
   return (
     <footer className="relative mt-auto border-t border-violet-100 bg-white/60 backdrop-blur-xl">
@@ -6,9 +8,7 @@ export function Footer() {
           {/* Brand */}
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm shadow-violet-200">
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
+              <Image src="/logo.png" alt="인핏 로고" width={28} height={28} className="h-7 w-7 brightness-0 invert" />
             </div>
             <div>
               <span className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">인핏</span>

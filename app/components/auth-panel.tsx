@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 type AuthView = 'login' | 'signup';
 
 type AuthPanelProps = {
@@ -50,11 +52,11 @@ export function AuthPanel({
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl shadow-lg shadow-blue-600/30">
-              🤖
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-2xl shadow-lg shadow-blue-600/30">
+              <Image src="/logo.png" alt="인핏 로고" width={40} height={40} className="h-12 w-12 brightness-0 invert" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">AI Interview</h1>
+              <h1 className="text-2xl font-black tracking-tight">나에게 딱맞는 인터뷰</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">회원가입 또는 로그인 후 면접을 시작할 수 있습니다.</p>
             </div>
           </div>

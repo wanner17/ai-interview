@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cc00ff"/>
+      <stop offset="100%" stop-color="#3d0066"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#cc00ff"/>
+      <stop offset="100%" stop-color="#3d0066"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 말풍선 테두리 -->
+  <path d="M4,5 Q4,2 7,2 L25,2 Q28,2 28,5 L28,19 Q28,22 25,22 L14,22 L10,28 L10,22 L7,22 Q4,22 4,19 Z"
+        fill="none" stroke="url(#bubbleGrad)" stroke-width="2"/>
+
+  <!-- 오디오 바 -->
+  <rect x="11" y="9" width="1.5" height="8" rx="0.75" fill="url(#waveGrad)"/>
+  <rect x="13.5" y="7" width="1.5" height="12" rx="0.75" fill="url(#waveGrad)"/>
+  <rect x="16" y="6" width="1.5" height="12" rx="0.75" fill="url(#waveGrad)"/>
+  <rect x="18.5" y="8" width="1.5" height="9" rx="0.75" fill="url(#waveGrad)"/>
+  <rect x="21" y="10" width="1.5" height="6" rx="0.75" fill="url(#waveGrad)"/>
+
+  <!-- 왼쪽 오디오 잭 -->
+  <line x1="1" y1="12" x2="10" y2="12" stroke="url(#bubbleGrad)" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- 오른쪽 오디오 잭 -->
+  <line x1="22" y1="12" x2="31" y2="12" stroke="url(#bubbleGrad)" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

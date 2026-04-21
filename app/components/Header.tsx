@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type AuthUser, fetchCurrentUser, logout } from '../lib/auth';
@@ -73,11 +74,9 @@ export function Header() {
           <div className="relative">
             <div className="absolute inset-0 rounded-xl bg-violet-400/30 blur-md transition-all group-hover:blur-lg" />
             <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-md shadow-violet-200 transition-transform group-hover:scale-105">
-              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
+              <Image src="/logo.png" alt="인핏 로고" width={32} height={32} className="h-8 w-8 brightness-0 invert" />
             </div>
-          </div>
+          </div>  
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
               인핏
