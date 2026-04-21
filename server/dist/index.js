@@ -4,7 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const path_1 = __importDefault(require("path"));
+dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), '..', '.env') });
 const express_1 = __importDefault(require("express"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
@@ -12,6 +13,12 @@ const speech_1 = require("@google-cloud/speech");
 const openai_1 = __importDefault(require("openai"));
 const multer_1 = __importDefault(require("multer"));
 const auth_route_1 = require("./routes/auth.route");
+const billing_route_1 = require("./routes/billing.route");
+const video_route_1 = require("./routes/video.route");
+const session_1 = require("./lib/session");
+const billing_repository_1 = require("./repositories/billing.repository");
+const user_repository_1 = require("./repositories/user.repository");
+const prisma_1 = require("./lib/prisma");
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
 const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
@@ -28,6 +35,8 @@ app.use((req, res, next) => {
 });
 app.use(express_1.default.json());
 app.use('/auth', auth_route_1.authRouter);
+app.use('/billing', billing_route_1.billingRouter);
+app.use('/videos', video_route_1.videoRouter);
 const io = new socket_io_1.Server(httpServer, {
     cors: { origin: clientOrigin, methods: ['GET', 'POST'], credentials: true },
 });
@@ -47,7 +56,7 @@ const DEFAULT_QUESTIONS = [
     "4. 마지막으로 하고 싶은 질문이나 말이 있다면 자유롭게 해주세요.",
 ];
 const LANGUAGE_NAMES = {
-    'ko-KR': '한국어', 'en-US': 'English', 'ja-JP': '日本語', 'zh-CN': '中文',
+    'ko-KR': '한국어', 'en-US': 'English', 'ja-JP': '일본어', 'zh-CN': '중국어',
 };
 const groupRooms = new Map();
 function generateRoomCode() {
@@ -219,17 +228,57 @@ async function generateFeedback(question, answer, focusScore, language, isFollow
     const langName = LANGUAGE_NAMES[language] || language;
     const prompt = language === 'ko-KR'
         ? `당신은 매우 엄격한 대기업 수석 면접관입니다. 날카롭고 객관적인 피드백을 제공하세요.\nJSON: {"score":정수(0~100),"good":"긍정 평가 1줄","bad":"개선점 1줄"}\n\n질문: ${question}${isFollowup ? ' [꼬리질문]' : ''}\n답변: ${answer}\n시선집중도: ${focusScore}%`
-        : `You are a strict senior interviewer evaluating a ${langName} interview. Analyze content, grammar, vocabulary, fluency.\nJSON: {"score":int(0-100),"good":"one positive","bad":"one improvement"}\n\nQuestion: ${question}${isFollowup ? ' [Follow-up]' : ''}\nAnswer: ${answer}\nEye contact: ${focusScore}%`;
+        : `당신은 엄격한 ${langName} 면접관입니다. 지원자의 ${langName} 답변을 평가하세요. 문법, 어휘, 유창성, 내용을 분석하고 반드시 한국어로 피드백을 작성하세요.\nJSON: {"score":정수(0~100),"good":"긍정 평가 1줄 (한국어)","bad":"개선점 1줄 (한국어)"}\n\n질문: ${question}${isFollowup ? ' [꼬리질문]' : ''}\n답변: ${answer}\n시선집중도: ${focusScore}%`;
     const completion = await openai.chat.completions.create({
         messages: [{ role: 'user', content: prompt }], model: 'gpt-3.5-turbo', response_format: { type: 'json_object' },
     });
     const r = JSON.parse(completion.choices[0].message?.content || '{}');
     return { score: typeof r.score === 'number' ? r.score : 0, good: r.good || '', bad: r.bad || '' };
 }
+// ── 소켓 쿠키에서 userId 추출 ──────────────────────────────────────────────────
+function getUserIdFromSocket(socket) {
+    const cookieHeader = socket.handshake.headers.cookie;
+    if (!cookieHeader)
+        return null;
+    const match = cookieHeader.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${session_1.SESSION_COOKIE_NAME}=`));
+    if (!match)
+        return null;
+    const token = match.slice(session_1.SESSION_COOKIE_NAME.length + 1);
+    const session = (0, session_1.verifySessionToken)(token);
+    return session?.userId ?? null;
+}
+// ── 토큰 차감 (3토큰/면접) ─────────────────────────────────────────────────────
+async function deductInterviewTokens(userId, socket) {
+    if (!userId) {
+        socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
+        return false;
+    }
+    const user = await user_repository_1.userRepository.findById(userId);
+    if (!user) {
+        socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
+        return false;
+    }
+    if (user.tokens < 3) {
+        socket.emit('interview_error', { code: 'INSUFFICIENT_TOKENS', message: `토큰이 부족합니다. 현재 ${user.tokens}토큰 (면접 1회 = 3토큰)` });
+        return false;
+    }
+    await prisma_1.prisma.$transaction(async (tx) => {
+        await billing_repository_1.billingRepository.incrementUserTokens(userId, -3, tx);
+        await billing_repository_1.billingRepository.createTokenTransaction({
+            userId,
+            transactionType: 'USE',
+            amount: -3,
+            balanceAfter: user.tokens - 3,
+            description: '면접 이용',
+        }, tx);
+    });
+    return true;
+}
 // ── Socket.IO ──────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
     console.log(`[Connected] ${socket.id}`);
     let recognizeStream = null;
+    const socketUserId = getUserIdFromSocket(socket);
     // 개인/외국어 면접 세션 상태
     let sessionQuestions = [...DEFAULT_QUESTIONS];
     let currentQuestionIndex = 0;
@@ -271,7 +320,10 @@ io.on('connection', (socket) => {
         }
     });
     // ── 개인/외국어 면접 ─────────────────────────────────────────────────────────
-    socket.on('start_interview', (data) => {
+    socket.on('start_interview', async (data) => {
+        const ok = await deductInterviewTokens(socketUserId, socket);
+        if (!ok)
+            return;
         currentQuestionIndex = 0;
         followupAskedForCurrent = false;
         lastMainQA = null;
@@ -336,6 +388,13 @@ io.on('connection', (socket) => {
         interviewResults.push({ question: data.question, answer: data.answer, focusScore, answerScore: score, analysis: data.analysis, isFollowup, feedback: { good, bad } });
     });
     // ── PT 면접 ──────────────────────────────────────────────────────────────────
+    // ── PT 면접 시작 (토큰 차감) ─────────────────────────────────────────────────
+    socket.on('start_pt_interview', async () => {
+        const ok = await deductInterviewTokens(socketUserId, socket);
+        if (!ok)
+            return;
+        socket.emit('pt_interview_started');
+    });
     socket.on('pt_submit_presentation', async (data) => {
         const { totalFrames, lookAwayFrames } = data.analysis || {};
         const focusScore = totalFrames > 0 ? Math.round(((totalFrames - lookAwayFrames) / totalFrames) * 100) : 0;
@@ -447,9 +506,12 @@ io.on('connection', (socket) => {
         broadcastDebateRoomList();
         console.log(`👤 [Debate] ${name} 참가 → ${code}`);
     });
-    socket.on('start_debate', (data) => {
+    socket.on('start_debate', async (data) => {
         const room = debateRooms.get(data.code);
         if (!room || room.hostId !== socket.id || room.participants.length < 2)
+            return;
+        const ok = await deductInterviewTokens(socketUserId, socket);
+        if (!ok)
             return;
         room.status = 'debating';
         // 찬반 배정
@@ -638,9 +700,12 @@ io.on('connection', (socket) => {
         broadcastRoomList();
         console.log(`👤 [Group] ${trimmedName} 참가 → ${code}`);
     });
-    socket.on('start_group_interview', (data) => {
+    socket.on('start_group_interview', async (data) => {
         const room = groupRooms.get(data.code);
         if (!room || room.hostId !== socket.id || room.participants.length < 1)
+            return;
+        const ok = await deductInterviewTokens(socketUserId, socket);
+        if (!ok)
             return;
         room.status = 'interviewing';
         room.questions = data.customQuestions?.length ? data.customQuestions : [...DEFAULT_QUESTIONS];

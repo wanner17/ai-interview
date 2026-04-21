@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
@@ -10,8 +11,92 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from '../lib/session';
 const ALLOWED_CONTENT_TYPES = ['video/webm', 'video/mp4', 'video/quicktime'];
 const PRESIGN_EXPIRES_IN = 900;
 const PLATFORM_FEE_RATE = 0.1;
+const BLUR_MODES = ['none', 'face', 'background'] as const;
+const VOICE_PITCHES = ['normal', 'high', 'low'] as const;
+
+type VideoRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  hashtags: string | null;
+  category: string;
+  videoUrl: string;
+  price: number;
+  isListed: boolean | number;
+  blurMode: string | null;
+  voicePitch: string | null;
+  sellerId: string;
+  feedbackData: Prisma.JsonValue | null;
+  createdAt: Date | string;
+  sellerUserId?: string;
+  sellerNickname?: string;
+};
+
+type PurchaseRow = {
+  id: string;
+  userId: string;
+  videoId: string;
+  pricePaid: number;
+  platformFee: number;
+  createdAt: Date | string;
+  videoTitle: string;
+  videoCategory: string;
+  videoBlurMode: string | null;
+  videoVoicePitch: string | null;
+  sellerNickname: string;
+};
+
+function normalizeVideo(row: VideoRow) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    hashtags: row.hashtags,
+    category: row.category,
+    videoUrl: row.videoUrl,
+    price: Number(row.price ?? 0),
+    isListed: Boolean(row.isListed),
+    blurMode: row.blurMode ?? 'none',
+    voicePitch: row.voicePitch ?? 'normal',
+    sellerId: row.sellerId,
+    feedbackData: row.feedbackData,
+    createdAt: row.createdAt,
+    ...(row.sellerUserId && row.sellerNickname
+      ? {
+          seller: {
+            userId: row.sellerUserId,
+            nickname: row.sellerNickname,
+          },
+        }
+      : {}),
+  };
+}
 
 class VideoController {
+  private async findOwnedVideo(id: string, userId: string) {
+    const rows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
+      SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.hashtags,
+        v.category,
+        v.video_url AS videoUrl,
+        v.price,
+        v.is_listed AS isListed,
+        v.blur_mode AS blurMode,
+        v.voice_pitch AS voicePitch,
+        v.seller_id AS sellerId,
+        v.feedback_data AS feedbackData,
+        v.createdAt
+      FROM Video v
+      WHERE v.id = ${id} AND v.seller_id = ${userId}
+      LIMIT 1
+    `);
+
+    return rows[0] ? normalizeVideo(rows[0]) : null;
+  }
+
   presignUpload = async (req: Request, res: Response) => {
     const { contentType = 'video/webm' } = req.body as { contentType?: string };
     if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
@@ -56,47 +141,78 @@ class VideoController {
       blurMode?: string; voicePitch?: string;
     };
 
-    const existing = await prisma.video.findFirst({ where: { id, sellerId: session.userId } });
+    const existing = await this.findOwnedVideo(id, session.userId);
     if (!existing) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
 
-    const BLUR_MODES = ['none', 'face', 'background'];
-    const VOICE_PITCHES = ['normal', 'high', 'low'];
+    await prisma.$executeRaw(
+      Prisma.sql`
+        UPDATE Video
+        SET
+          title = ${title !== undefined ? title : existing.title},
+          description = ${description !== undefined ? description : existing.description},
+          hashtags = ${
+            hashtags !== undefined
+              ? JSON.stringify(hashtags)
+              : existing.hashtags
+          },
+          price = ${price !== undefined ? Math.max(0, Number(price)) : existing.price},
+          is_listed = ${isListed !== undefined ? isListed : existing.isListed},
+          blur_mode = ${
+            blurMode !== undefined && BLUR_MODES.includes(blurMode as (typeof BLUR_MODES)[number])
+              ? blurMode
+              : existing.blurMode
+          },
+          voice_pitch = ${
+            voicePitch !== undefined && VOICE_PITCHES.includes(voicePitch as (typeof VOICE_PITCHES)[number])
+              ? voicePitch
+              : existing.voicePitch
+          }
+        WHERE id = ${id} AND seller_id = ${session.userId}
+      `,
+    );
 
-    const video = await prisma.video.update({
-      where: { id },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(hashtags !== undefined && { hashtags: JSON.stringify(hashtags) }),
-        ...(price !== undefined && { price: Math.max(0, Number(price)) }),
-        ...(isListed !== undefined && { isListed }),
-        ...(blurMode !== undefined && BLUR_MODES.includes(blurMode) && { blurMode }),
-        ...(voicePitch !== undefined && VOICE_PITCHES.includes(voicePitch) && { voicePitch }),
-      },
-    });
+    const video = await this.findOwnedVideo(id, session.userId);
     return res.json({ ok: true, video });
   };
 
   // 마켓 목록 (isListed=true인 영상)
   marketList = async (req: Request, res: Response) => {
     const { category, q } = req.query as { category?: string; q?: string };
-    const videos = await prisma.video.findMany({
-      where: {
-        isListed: true,
-        ...(category && { category }),
-        ...(q && {
-          OR: [
-            { title: { contains: q } },
-            { description: { contains: q } },
-            { hashtags: { contains: q } },
-          ],
-        }),
-      },
-      include: { seller: { select: { userId: true, nickname: true } } },
-      orderBy: { createdAt: 'desc' },
+    const likeQuery = q ? `%${q}%` : null;
+    const rows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
+      SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.hashtags,
+        v.category,
+        v.video_url AS videoUrl,
+        v.price,
+        v.is_listed AS isListed,
+        v.blur_mode AS blurMode,
+        v.voice_pitch AS voicePitch,
+        v.seller_id AS sellerId,
+        v.feedback_data AS feedbackData,
+        v.createdAt,
+        u.user_id AS sellerUserId,
+        u.nickname AS sellerNickname
+      FROM Video v
+      JOIN User u ON u.user_id = v.seller_id
+      WHERE v.is_listed = true
+        AND (${category ?? null} IS NULL OR v.category = ${category ?? null})
+        AND (
+          ${likeQuery} IS NULL
+          OR v.title LIKE ${likeQuery}
+          OR v.description LIKE ${likeQuery}
+          OR v.hashtags LIKE ${likeQuery}
+        )
+      ORDER BY v.createdAt DESC
+    `);
+
+    const safe = rows.map((row) => {
+      const { videoUrl: _videoUrl, ...rest } = normalizeVideo(row);
+      return rest;
     });
-    // videoUrl 제외하여 반환 (구매 전 접근 차단)
-    const safe = videos.map(({ videoUrl: _, ...v }) => v);
     return res.json({ ok: true, videos: safe });
   };
 
@@ -106,10 +222,29 @@ class VideoController {
     const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
 
     const { id } = req.params;
-    const video = await prisma.video.findFirst({
-      where: { id, isListed: true },
-      include: { seller: { select: { userId: true, nickname: true } } },
-    });
+    const rows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
+      SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.hashtags,
+        v.category,
+        v.video_url AS videoUrl,
+        v.price,
+        v.is_listed AS isListed,
+        v.blur_mode AS blurMode,
+        v.voice_pitch AS voicePitch,
+        v.seller_id AS sellerId,
+        v.feedback_data AS feedbackData,
+        v.createdAt,
+        u.user_id AS sellerUserId,
+        u.nickname AS sellerNickname
+      FROM Video v
+      JOIN User u ON u.user_id = v.seller_id
+      WHERE v.id = ${id} AND v.is_listed = true
+      LIMIT 1
+    `);
+    const video = rows[0] ? normalizeVideo(rows[0]) : null;
     if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
 
     const isSeller = session?.userId === video.sellerId;
@@ -135,7 +270,26 @@ class VideoController {
     if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
     const { id } = req.params;
-    const video = await prisma.video.findFirst({ where: { id, isListed: true } });
+    const marketRows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
+      SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.hashtags,
+        v.category,
+        v.video_url AS videoUrl,
+        v.price,
+        v.is_listed AS isListed,
+        v.blur_mode AS blurMode,
+        v.voice_pitch AS voicePitch,
+        v.seller_id AS sellerId,
+        v.feedback_data AS feedbackData,
+        v.createdAt
+      FROM Video v
+      WHERE v.id = ${id} AND v.is_listed = true
+      LIMIT 1
+    `);
+    const video = marketRows[0] ? normalizeVideo(marketRows[0]) : null;
     if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
     if (video.sellerId === session.userId) {
       return res.status(400).json({ ok: false, error: '본인 영상은 구매할 수 없습니다.' });
@@ -150,9 +304,12 @@ class VideoController {
 
     // 무료 영상: 토큰 차감 없이 Purchase 생성
     if (price === 0) {
-      await prisma.purchase.create({
-        data: { userId: session.userId, videoId: id, pricePaid: 0, platformFee: 0 },
-      });
+      await prisma.$executeRaw(
+        Prisma.sql`
+          INSERT INTO Purchase (id, user_id, video_id, price_paid, platform_fee, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, NOW())
+        `,
+      );
       return res.json({ ok: true });
     }
 
@@ -168,9 +325,12 @@ class VideoController {
       // 판매자 토큰 지급 (90%)
       prisma.user.update({ where: { userId: video.sellerId }, data: { tokens: { increment: sellerIncome } } }),
       // Purchase 기록
-      prisma.purchase.create({
-        data: { userId: session.userId, videoId: id, pricePaid: price, platformFee },
-      }),
+      prisma.$executeRaw(
+        Prisma.sql`
+          INSERT INTO Purchase (id, user_id, video_id, price_paid, platform_fee, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, NOW())
+        `,
+      ),
       // 구매자 토큰 트랜잭션
       prisma.tokenTransaction.create({
         data: {
@@ -202,16 +362,42 @@ class VideoController {
     const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
     if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-    const purchases = await prisma.purchase.findMany({
-      where: { userId: session.userId },
-      include: {
+    const purchases = await prisma.$queryRaw<PurchaseRow[]>(Prisma.sql`
+      SELECT
+        p.id,
+        p.user_id AS userId,
+        p.video_id AS videoId,
+        p.price_paid AS pricePaid,
+        p.platform_fee AS platformFee,
+        p.createdAt,
+        v.title AS videoTitle,
+        v.category AS videoCategory,
+        v.blur_mode AS videoBlurMode,
+        v.voice_pitch AS videoVoicePitch,
+        u.nickname AS sellerNickname
+      FROM Purchase p
+      JOIN Video v ON v.id = p.video_id
+      JOIN User u ON u.user_id = v.seller_id
+      WHERE p.user_id = ${session.userId}
+      ORDER BY p.createdAt DESC
+    `);
+
+    return res.json({
+      ok: true,
+      purchases: purchases.map((purchase) => ({
+        id: purchase.id,
+        pricePaid: Number(purchase.pricePaid ?? 0),
+        createdAt: purchase.createdAt,
         video: {
-          include: { seller: { select: { userId: true, nickname: true } } },
+          id: purchase.videoId,
+          title: purchase.videoTitle,
+          category: purchase.videoCategory,
+          blurMode: purchase.videoBlurMode ?? 'none',
+          voicePitch: purchase.videoVoicePitch ?? 'normal',
+          seller: { nickname: purchase.sellerNickname },
         },
-      },
-      orderBy: { createdAt: 'desc' },
+      })),
     });
-    return res.json({ ok: true, purchases });
   };
 
   list = async (_req: Request, res: Response) => {
@@ -226,11 +412,26 @@ class VideoController {
     const cookies = parseCookies(req.headers.cookie);
     const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
     if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
-    const videos = await prisma.video.findMany({
-      where: { sellerId: session.userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return res.json({ ok: true, videos });
+    const rows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
+      SELECT
+        v.id,
+        v.title,
+        v.description,
+        v.hashtags,
+        v.category,
+        v.video_url AS videoUrl,
+        v.price,
+        v.is_listed AS isListed,
+        v.blur_mode AS blurMode,
+        v.voice_pitch AS voicePitch,
+        v.seller_id AS sellerId,
+        v.feedback_data AS feedbackData,
+        v.createdAt
+      FROM Video v
+      WHERE v.seller_id = ${session.userId}
+      ORDER BY v.createdAt DESC
+    `);
+    return res.json({ ok: true, videos: rows.map(normalizeVideo) });
   };
 
   getOne = async (req: Request, res: Response) => {
@@ -238,7 +439,7 @@ class VideoController {
     const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
     if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
     const { id } = req.params;
-    const video = await prisma.video.findFirst({ where: { id, sellerId: session.userId } });
+    const video = await this.findOwnedVideo(id, session.userId);
     if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
     return res.json({ ok: true, video });
   };

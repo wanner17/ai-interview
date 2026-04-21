@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthError = exports.authService = void 0;
 const crypto_1 = require("crypto");
 const user_repository_1 = require("../repositories/user.repository");
+const billing_repository_1 = require("../repositories/billing.repository");
 const session_1 = require("../lib/session");
 const ACTIVE_USER_STATUS = 'ACTIVE';
 const DEFAULT_USER_ROLE = 'USER';
@@ -54,10 +55,17 @@ class AuthService {
             email,
             passwordHash,
             nickname,
-            tokens: 0,
+            tokens: 10,
             userName: userName ?? undefined,
             userRole: DEFAULT_USER_ROLE,
             userStatus: ACTIVE_USER_STATUS,
+        });
+        await billing_repository_1.billingRepository.createTokenTransaction({
+            userId: user.userId,
+            transactionType: 'CHARGE',
+            amount: 10,
+            balanceAfter: 10,
+            description: '회원가입 축하 토큰',
         });
         const sessionToken = (0, session_1.createSessionToken)(user.userId);
         return {

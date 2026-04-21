@@ -61,6 +61,7 @@ class UserRepository {
             email: user.email,
             nickname: user.nickname,
             userName: user.userName,
+            tokens: user.tokens,
             userRole: user.userRole,
             userStatus: user.userStatus,
             lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
