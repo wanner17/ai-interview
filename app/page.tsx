@@ -18,7 +18,7 @@ import { GeneralReport } from './components/results/GeneralReport';
 import { GroupReport } from './components/results/GroupReport';
 import { PTReport } from './components/results/PTReport';
 import { DebateReport } from './components/results/DebateReport';
-import { loginWithPassword, signUpWithPassword } from './lib/auth';
+import { loginWithPassword, signUpWithPassword, fetchCurrentUser, type AuthUser } from './lib/auth';
 
 const API_BASE = '';
 
@@ -28,6 +28,9 @@ export default function Home() {
   const searchParams = useSearchParams();
   const authParam = searchParams.get('auth');
   const authView = authParam === 'login' || authParam === 'signup' ? authParam : null;
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null | undefined>(undefined);
+  const [interviewTokenError, setInterviewTokenError] = useState<string | null>(null);
 
   const [landingDone, setLandingDone] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -249,6 +252,11 @@ export default function Home() {
     }
   };
 
+  // ── 유저 정보 로드 ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
+  }, []);
+
   useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
   useEffect(() => { interviewTypeRef.current = interviewType || 'individual'; }, [interviewType]);
   useEffect(() => { activeQuestionRef.current = currentQuestion; }, [currentQuestion]);
@@ -285,6 +293,16 @@ export default function Home() {
     });
     socket.on('interview_finished', (results: any[]) => {
       stopAndUploadVideoCbRef.current(interviewTypeRef.current, results).then(() => setReportData(results));
+    });
+    socket.on('interview_error', (data: { code: string; message: string }) => {
+      setInterviewTokenError(data.message);
+    });
+    socket.on('pt_interview_started', () => {
+      setPtPhase('presenting');
+      ptTranscriptRef.current = '';
+      setSttText('');
+      finalizedTextRef.current = '';
+      analysisDataRef.current = { totalFrames: 0, lookAwayFrames: 0, mouthOpenFrames: 0 };
     });
 
     socket.on('group_room_created', (data: any) => {
@@ -421,6 +439,8 @@ export default function Home() {
       socket.off('stt_result');
       socket.off('next_question');
       socket.off('interview_finished');
+      socket.off('interview_error');
+      socket.off('pt_interview_started');
       socket.off('group_room_created');
       socket.off('group_room_joined');
       socket.off('group_room_updated');
@@ -959,6 +979,45 @@ export default function Home() {
     return <LandingPage onStart={() => setLandingDone(true)} />;
   }
 
+  // ── 비로그인 차단 ─────────────────────────────────────────────────────────────
+  if (currentUser === undefined) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+          <p className="text-sm">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser === null) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center bg-white dark:bg-[#111118] rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-10">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">로그인이 필요합니다</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm leading-relaxed">
+            AI 면접 서비스를 이용하려면 로그인이 필요합니다.<br />
+            회원가입 시 <span className="font-bold text-violet-600">10 토큰</span>을 무료로 드립니다!
+          </p>
+          <div className="flex flex-col gap-3">
+            <a href="/?auth=signup" className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-sm shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all hover:-translate-y-0.5">
+              무료 회원가입
+            </a>
+            <a href="/?auth=login" className="w-full py-3 rounded-2xl border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+              로그인
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── 메인 화면 ────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 md:p-8 flex flex-col items-center">
@@ -1097,11 +1156,7 @@ export default function Home() {
             ptQAFeedback={ptQAFeedback}
             onGenerateTopic={handleGeneratePtTopic}
             onStartPresenting={() => {
-              setPtPhase('presenting');
-              ptTranscriptRef.current = '';
-              setSttText('');
-              finalizedTextRef.current = '';
-              analysisDataRef.current = { totalFrames: 0, lookAwayFrames: 0, mouthOpenFrames: 0 };
+              socket.emit('start_pt_interview');
             }}
             videoRef={videoRef}
             canvasRef={canvasRef}
@@ -1177,6 +1232,9 @@ export default function Home() {
             generatedQuestions={generatedQuestions}
             interviewType={interviewType}
             foreignLanguage={foreignLanguage}
+            currentUser={currentUser}
+            interviewTokenError={interviewTokenError}
+            onClearTokenError={() => setInterviewTokenError(null)}
             onToggleRecording={toggleRecording}
             onSubmitAnswer={() => {
               socket.emit('submit_answer', { question: currentQuestion, answer: sttText, analysis: analysisDataRef.current, isFollowup: isCurrentFollowup });

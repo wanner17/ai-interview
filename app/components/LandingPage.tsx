@@ -133,7 +133,7 @@ export function LandingPage({ onStart }: Props) {
         <div className="rounded-3xl border border-violet-100 bg-white p-10 shadow-sm text-center">
           <h2 className="text-2xl font-black text-gray-900 mb-3">지금 바로 시작하세요</h2>
           <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-            별도 회원가입 없이 바로 사용할 수 있습니다.<br />카메라와 마이크만 준비해주세요.
+            회원가입 시 <span className="font-semibold text-violet-600">10 토큰</span>을 무료로 드립니다.<br />카메라와 마이크만 준비해주세요.
           </p>
           <button
             onClick={onStart}

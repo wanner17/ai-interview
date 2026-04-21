@@ -8,8 +8,8 @@ import { type AuthUser, fetchCurrentUser, logout } from '../lib/auth';
 
 const navItems = [
   { label: '면접 시작', href: '/' },
-  { label: '면접 유형', href: '#types' },
-  { label: '이용 가이드', href: '#guide' },
+  { label: '면접 유형', href: '/interview-types' },
+  { label: '이용 가이드', href: '/guide' },
 ];
 
 const authNavItems = [
@@ -93,13 +93,13 @@ export function Header() {
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-0.5">
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className="rounded-lg px-3.5 py-1.5 text-sm text-gray-500 transition-all hover:text-violet-700 hover:bg-violet-50"
             >
               {item.label}
-            </a>
+            </Link>
           ))}
           {isAuthenticated && authNavItems.map((item) => (
             <Link
@@ -183,14 +183,14 @@ export function Header() {
         <div className="relative md:hidden border-t border-violet-100 bg-white/90 px-4 py-4 backdrop-blur-xl">
           <nav className="flex flex-col gap-0.5 mb-4">
             {navItems.map((item) => (
-              <a
+              <Link
                 key={item.label}
                 href={item.href}
                 onClick={() => setMenuOpen(false)}
                 className="rounded-lg px-3 py-2.5 text-sm text-gray-500 transition-colors hover:bg-violet-50 hover:text-violet-700"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
             {isAuthenticated && authNavItems.map((item) => (
               <Link

@@ -1,6 +1,7 @@
 import { RefObject } from 'react';
 import { StatusBadge } from '../StatusBadge';
 import { socket } from '../../socket';
+import type { AuthUser } from '../../lib/auth';
 
 interface GeneralInterviewProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -17,6 +18,9 @@ interface GeneralInterviewProps {
   generatedQuestions: string[] | null;
   interviewType: string | null;
   foreignLanguage: string;
+  currentUser: AuthUser | null | undefined;
+  interviewTokenError: string | null;
+  onClearTokenError: () => void;
   onToggleRecording: () => void;
   onSubmitAnswer: () => void;
 }
@@ -27,25 +31,42 @@ export function GeneralInterview({
   isRecording, sttText,
   currentQuestion, isInterviewFinished, isCurrentFollowup,
   generatedQuestions, interviewType, foreignLanguage,
+  currentUser, interviewTokenError, onClearTokenError,
   onToggleRecording, onSubmitAnswer,
 }: GeneralInterviewProps) {
   return (
     <div className="flex flex-col gap-5">
+      {/* 토큰 에러 토스트 */}
+      {interviewTokenError && (
+        <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">{interviewTokenError}</p>
+          <button onClick={onClearTokenError} className="text-rose-400 hover:text-rose-600 flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       {/* 질문 카드 */}
       <div className="bg-white dark:bg-[#111118] rounded-3xl shadow-xl shadow-blue-900/5 dark:shadow-black/30 border border-gray-100 dark:border-white/5 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
         <div className="px-8 py-10 flex flex-col items-center justify-center min-h-[140px] text-center">
           {!currentQuestion ? (
-            <button
-              onClick={() => socket.emit('start_interview', {
-                customQuestions: generatedQuestions || [],
-                interviewType: interviewType || 'individual',
-                language: interviewType === 'foreign' ? foreignLanguage : 'ko-KR',
-              })}
-              className="px-10 py-4 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-gray-50 text-white dark:text-zinc-900 font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5 text-lg"
-            >
-              면접 시작하기
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              {currentUser && (
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  보유 토큰: <span className="font-bold text-amber-600">{currentUser.tokens}</span>토큰 (면접 1회 = 3토큰 차감)
+                </p>
+              )}
+              <button
+                onClick={() => socket.emit('start_interview', {
+                  customQuestions: generatedQuestions || [],
+                  interviewType: interviewType || 'individual',
+                  language: interviewType === 'foreign' ? foreignLanguage : 'ko-KR',
+                })}
+                className="px-10 py-4 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-gray-50 text-white dark:text-zinc-900 font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5 text-lg"
+              >
+                면접 시작하기
+              </button>
+            </div>
           ) : (
             <div className="flex items-start gap-4 text-left w-full max-w-3xl">
               <span className={`flex-shrink-0 w-10 h-10 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg mt-1 ${

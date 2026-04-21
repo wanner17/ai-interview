@@ -12,6 +12,10 @@ import multer from 'multer';
 import { authRouter } from './routes/auth.route';
 import { billingRouter } from './routes/billing.route';
 import { videoRouter } from './routes/video.route';
+import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/session';
+import { billingRepository } from './repositories/billing.repository';
+import { userRepository } from './repositories/user.repository';
+import { prisma } from './lib/prisma';
 
 const app = express();
 const httpServer = createServer(app);
@@ -250,10 +254,50 @@ async function generateFeedback(
   return { score: typeof r.score === 'number' ? r.score : 0, good: r.good || '', bad: r.bad || '' };
 }
 
+// ── 소켓 쿠키에서 userId 추출 ──────────────────────────────────────────────────
+function getUserIdFromSocket(socket: any): string | null {
+  const cookieHeader = socket.handshake.headers.cookie as string | undefined;
+  if (!cookieHeader) return null;
+  const match = cookieHeader.split(';').map((c: string) => c.trim()).find((c: string) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
+  if (!match) return null;
+  const token = match.slice(SESSION_COOKIE_NAME.length + 1);
+  const session = verifySessionToken(token);
+  return session?.userId ?? null;
+}
+
+// ── 토큰 차감 (3토큰/면접) ─────────────────────────────────────────────────────
+async function deductInterviewTokens(userId: string | null, socket: any): Promise<boolean> {
+  if (!userId) {
+    socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
+    return false;
+  }
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
+    return false;
+  }
+  if (user.tokens < 3) {
+    socket.emit('interview_error', { code: 'INSUFFICIENT_TOKENS', message: `토큰이 부족합니다. 현재 ${user.tokens}토큰 (면접 1회 = 3토큰)` });
+    return false;
+  }
+  await prisma.$transaction(async (tx) => {
+    await billingRepository.incrementUserTokens(userId, -3, tx);
+    await billingRepository.createTokenTransaction({
+      userId,
+      transactionType: 'USE',
+      amount: -3,
+      balanceAfter: user.tokens - 3,
+      description: '면접 이용',
+    }, tx);
+  });
+  return true;
+}
+
 // ── Socket.IO ──────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[Connected] ${socket.id}`);
   let recognizeStream: any = null;
+  const socketUserId = getUserIdFromSocket(socket);
 
   // 개인/외국어 면접 세션 상태
   let sessionQuestions = [...DEFAULT_QUESTIONS];
@@ -293,7 +337,9 @@ io.on('connection', (socket) => {
   });
 
   // ── 개인/외국어 면접 ─────────────────────────────────────────────────────────
-  socket.on('start_interview', (data?: { customQuestions?: string[]; interviewType?: string; language?: string }) => {
+  socket.on('start_interview', async (data?: { customQuestions?: string[]; interviewType?: string; language?: string }) => {
+    const ok = await deductInterviewTokens(socketUserId, socket);
+    if (!ok) return;
     currentQuestionIndex = 0; followupAskedForCurrent = false; lastMainQA = null; interviewResults.length = 0;
     sessionInterviewType = data?.interviewType || 'individual';
     sessionLanguage = data?.language || 'ko-KR';
@@ -339,6 +385,13 @@ io.on('connection', (socket) => {
   });
 
   // ── PT 면접 ──────────────────────────────────────────────────────────────────
+  // ── PT 면접 시작 (토큰 차감) ─────────────────────────────────────────────────
+  socket.on('start_pt_interview', async () => {
+    const ok = await deductInterviewTokens(socketUserId, socket);
+    if (!ok) return;
+    socket.emit('pt_interview_started');
+  });
+
   socket.on('pt_submit_presentation', async (data: { topic: string; transcript: string; analysis: any }) => {
     const { totalFrames, lookAwayFrames } = data.analysis || {};
     const focusScore = totalFrames > 0 ? Math.round(((totalFrames - lookAwayFrames) / totalFrames) * 100) : 0;
@@ -436,9 +489,11 @@ io.on('connection', (socket) => {
     console.log(`👤 [Debate] ${name} 참가 → ${code}`);
   });
 
-  socket.on('start_debate', (data: { code: string }) => {
+  socket.on('start_debate', async (data: { code: string }) => {
     const room = debateRooms.get(data.code);
     if (!room || room.hostId !== socket.id || room.participants.length < 2) return;
+    const ok = await deductInterviewTokens(socketUserId, socket);
+    if (!ok) return;
     room.status = 'debating';
 
     // 찬반 배정
@@ -618,9 +673,11 @@ io.on('connection', (socket) => {
     console.log(`👤 [Group] ${trimmedName} 참가 → ${code}`);
   });
 
-  socket.on('start_group_interview', (data: { code: string; customQuestions?: string[] }) => {
+  socket.on('start_group_interview', async (data: { code: string; customQuestions?: string[] }) => {
     const room = groupRooms.get(data.code);
     if (!room || room.hostId !== socket.id || room.participants.length < 1) return;
+    const ok = await deductInterviewTokens(socketUserId, socket);
+    if (!ok) return;
     room.status = 'interviewing';
     room.questions = data.customQuestions?.length ? data.customQuestions : [...DEFAULT_QUESTIONS];
     // 답변 순서 셔플
