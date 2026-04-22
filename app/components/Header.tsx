@@ -112,12 +112,12 @@ export function Header() {
           <div className="relative">
             <div className="absolute inset-0 rounded-xl bg-violet-400/30 blur-md transition-all group-hover:blur-lg" />
             <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-md shadow-violet-200 transition-transform group-hover:scale-105">
-              <Image src="/logo.png" alt="인핏 로고" width={32} height={32} className="h-8 w-8 brightness-0 invert" />
+              <Image src="/logo.png" alt="인패스 로고" width={32} height={32} className="h-8 w-8 brightness-0 invert" />
             </div>
           </div>  
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold tracking-tight bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-              인핏
+              인패스
             </span>
             <span className="text-[10px] text-gray-400 mt-0.5">AI Interview</span>
           </div>

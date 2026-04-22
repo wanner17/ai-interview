@@ -53,7 +53,7 @@ export function AuthPanel({
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-2xl shadow-lg shadow-blue-600/30">
-              <Image src="/logo.png" alt="인핏 로고" width={40} height={40} className="h-12 w-12 brightness-0 invert" />
+              <Image src="/logo.png" alt="인패스 로고" width={40} height={40} className="h-12 w-12 brightness-0 invert" />
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight">나에게 딱맞는 인터뷰</h1>

@@ -8,10 +8,10 @@ export function Footer() {
           {/* Brand */}
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm shadow-violet-200">
-              <Image src="/logo.png" alt="인핏 로고" width={28} height={28} className="h-7 w-7 brightness-0 invert" />
+              <Image src="/logo.png" alt="인패스 로고" width={28} height={28} className="h-7 w-7 brightness-0 invert" />
             </div>
             <div>
-              <span className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">인핏</span>
+              <span className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">인패스</span>
               <p className="text-[11px] text-gray-400 mt-0.5">AI 기반 실전 면접 시뮬레이터</p>
             </div>
           </div>
@@ -39,7 +39,7 @@ export function Footer() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-60" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-500" />
             </span>
-            <p className="text-xs text-gray-400">© 2026 인핏</p>
+            <p className="text-xs text-gray-400">© 2026 인패스</p>
           </div>
         </div>
       </div>

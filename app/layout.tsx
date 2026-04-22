@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "인핏",
+  title: "인패스 - AI 면접 시뮬레이터",
   description: "AI 기반 실전 면접 시뮬레이터",
 };
 

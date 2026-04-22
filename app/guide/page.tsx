@@ -89,7 +89,7 @@ export default function GuidePage() {
       {/* 헤더 */}
       <div className="mb-12 text-center">
         <h1 className="text-4xl font-black tracking-tight text-gray-900 mb-3">이용 가이드</h1>
-        <p className="text-gray-400 text-lg">인핏을 처음 사용하시는 분도 쉽게 따라할 수 있어요</p>
+        <p className="text-gray-400 text-lg">인패스를 처음 사용하시는 분도 쉽게 따라할 수 있어요</p>
       </div>
 
       {/* 시작 전 요구사항 */}
