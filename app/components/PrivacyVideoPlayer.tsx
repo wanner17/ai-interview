@@ -36,6 +36,7 @@ registerProcessor('privacy-pitch-shift', PitchShiftProcessor);
 `;
 
 function fmtTime(s: number) {
+  if (!isFinite(s) || isNaN(s)) return '0:00';
   return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
@@ -65,8 +66,10 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
   // BlazeFace
   const modelRef = useRef<any | null>(null);
   const faceBoxRef = useRef<{ cx: number; cy: number; rx: number; ry: number } | null>(null);
+  const targetFaceBoxRef = useRef<{ cx: number; cy: number; rx: number; ry: number } | null>(null);
   const frameCountRef = useRef(0);
   const detectingRef = useRef(false);
+  const offCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Audio
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -80,9 +83,11 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
 
   useEffect(() => { blurModeRef.current = blurMode; }, [blurMode]);
 
-  // BlazeFace 모델 로드
+  // BlazeFace 모델 로드 (none↔active 전환 시에만 재로드, face↔background 전환 시 유지)
+  const isBlurActive = blurMode !== 'none';
   useEffect(() => {
-    if (blurMode === 'none') return;
+    if (!isBlurActive) return;
+    if (modelRef.current) return; // 이미 로드됨
     let cancelled = false;
     (async () => {
       try {
@@ -97,10 +102,16 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     })();
     return () => {
       cancelled = true;
+    };
+  }, [isBlurActive]);
+
+  useEffect(() => {
+    if (!isBlurActive) {
       modelRef.current = null;
       faceBoxRef.current = null;
-    };
-  }, [blurMode]);
+      targetFaceBoxRef.current = null;
+    }
+  }, [isBlurActive]);
 
   // 캔버스 렌더링 루프
   useEffect(() => {
@@ -120,12 +131,12 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
         const predictions = await modelRef.current.estimateFaces(videoEl, false);
         if (predictions.length > 0) {
           const p = predictions[0];
-          faceBoxRef.current = boxToEllipse(p.topLeft as [number, number], p.bottomRight as [number, number]);
+          targetFaceBoxRef.current = boxToEllipse(p.topLeft as [number, number], p.bottomRight as [number, number]);
         } else {
-          faceBoxRef.current = null;
+          targetFaceBoxRef.current = null;
         }
-      } catch {
-        // 감지 실패 시 이전 박스 유지
+      } catch (e) {
+        console.warn('[blazeface detect]', e);
       } finally {
         detectingRef.current = false;
       }
@@ -141,13 +152,32 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
         const bm = blurModeRef.current;
         const face = faceBoxRef.current;
 
-        // 5프레임마다 얼굴 감지 실행 (비동기, 렌더 블로킹 없음)
+        // 3프레임마다 얼굴 감지 실행 (비동기, 렌더 블로킹 없음)
         frameCountRef.current += 1;
-        if (frameCountRef.current % 5 === 0) runDetection();
+        if (frameCountRef.current % 3 === 0) runDetection();
+
+        // 현재 face box를 target 쪽으로 부드럽게 보간
+        const LERP = 0.25;
+        const target = targetFaceBoxRef.current;
+        const current = faceBoxRef.current;
+        if (target) {
+          if (!current) {
+            faceBoxRef.current = { ...target };
+          } else {
+            faceBoxRef.current = {
+              cx: current.cx + (target.cx - current.cx) * LERP,
+              cy: current.cy + (target.cy - current.cy) * LERP,
+              rx: current.rx + (target.rx - current.rx) * LERP,
+              ry: current.ry + (target.ry - current.ry) * LERP,
+            };
+          }
+        } else {
+          faceBoxRef.current = null;
+        }
 
         if (bm === 'background') {
           ctx.save();
-          ctx.filter = 'blur(18px)';
+          ctx.filter = 'blur(24px)';
           ctx.drawImage(videoEl, 0, 0, vw, vh);
           ctx.restore();
 
@@ -163,12 +193,21 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
           ctx.drawImage(videoEl, 0, 0, vw, vh);
 
           if (face) {
+            // clip 이후 filter를 적용하면 blur가 ellipse 경계 밖 픽셀 참조 불가.
+            // offscreen canvas에서 전체 프레임 blur 후 clip-draw.
+            if (!offCanvasRef.current) offCanvasRef.current = document.createElement('canvas');
+            const off = offCanvasRef.current;
+            if (off.width !== vw) off.width = vw;
+            if (off.height !== vh) off.height = vh;
+            const offCtx = off.getContext('2d')!;
+            offCtx.filter = 'blur(32px)';
+            offCtx.drawImage(videoEl, 0, 0, vw, vh);
+
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(face.cx, face.cy, face.rx, face.ry, 0, 0, Math.PI * 2);
             ctx.clip();
-            ctx.filter = 'blur(24px)';
-            ctx.drawImage(videoEl, 0, 0, vw, vh);
+            ctx.drawImage(off, 0, 0);
             ctx.restore();
           }
         }
@@ -193,23 +232,25 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     (async () => {
       if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
         audioCtxRef.current = new AudioContext();
-        // audioSourceRef는 초기화하지 않음 — mediaElement 비교로 재사용 여부 판단
         workletLoadedRef.current = false;
       }
       const audioCtx = audioCtxRef.current;
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       if (cancelled) return;
 
-      // 현재 video 엘리먼트와 연결된 소스 노드가 없을 때만 새로 생성
-      // (한 video 엘리먼트는 AudioContext 전체에서 단 하나의 소스 노드만 가질 수 있음)
-      if (!audioSourceRef.current || audioSourceRef.current.mediaElement !== videoEl) {
+      // MediaElementAudioSourceNode는 video 엘리먼트당 AudioContext 전체에서 단 하나만 생성 가능.
+      // remount 시 ref가 초기화되더라도 video 엘리먼트에 직접 저장된 노드를 재사용.
+      type VideoWithSource = HTMLVideoElement & { _audioSource?: MediaElementAudioSourceNode };
+      const tagged = videoEl as VideoWithSource;
+      if (!tagged._audioSource || tagged._audioSource.context !== audioCtx) {
         try {
-          audioSourceRef.current = audioCtx.createMediaElementSource(videoEl);
+          tagged._audioSource = audioCtx.createMediaElementSource(videoEl);
         } catch (e) {
           console.error('[privacy-player] Cannot create audio source:', e);
           return;
         }
       }
+      audioSourceRef.current = tagged._audioSource;
       const source = audioSourceRef.current;
       source.disconnect();
       pitchNodeRef.current?.disconnect();
@@ -246,7 +287,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     })().catch(e => console.error('[privacy-player voice]', e));
 
     return () => { cancelled = true; };
-  }, [voicePitch, blurMode]);
+  }, [voicePitch]);
 
   // 재생 상태 이벤트
   useEffect(() => {
@@ -255,20 +296,23 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTime = () => setCurrentTime(v.currentTime);
-    const onLoaded = () => setDuration(v.duration);
+    const onLoaded = () => { if (isFinite(v.duration)) setDuration(v.duration); };
+    const onDurationChange = () => { if (isFinite(v.duration)) setDuration(v.duration); };
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
     v.addEventListener('timeupdate', onTime);
     v.addEventListener('loadedmetadata', onLoaded);
+    v.addEventListener('durationchange', onDurationChange);
     return () => {
       v.removeEventListener('play', onPlay);
       v.removeEventListener('pause', onPause);
       v.removeEventListener('timeupdate', onTime);
       v.removeEventListener('loadedmetadata', onLoaded);
+      v.removeEventListener('durationchange', onDurationChange);
     };
   }, [src]);
 
-  useEffect(() => () => { audioCtxRef.current?.close(); }, []);
+  useEffect(() => () => { audioCtxRef.current?.suspend().catch(() => {}); }, []);
 
   const togglePlay = useCallback(async () => {
     const v = videoRef.current;
@@ -282,55 +326,53 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     if (v) v.currentTime = Number(e.target.value);
   }, []);
 
-  if (blurMode === 'none') {
-    return (
-      <div className="aspect-video">
-        <video src={src} controls className="h-full w-full object-contain" />
-      </div>
-    );
-  }
-
   return (
     <div>
-      {/* 히든 video — 디코딩 담당 */}
+      {/* video — blurMode 관계없이 항상 같은 DOM 엘리먼트 유지 (AudioContext source 재연결 오류 방지) */}
       <video
         ref={videoRef}
         src={src}
-        className="hidden"
-        onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
+        crossOrigin="anonymous"
+        controls={blurMode === 'none'}
+        className={blurMode === 'none' ? 'aspect-video w-full object-contain' : 'hidden'}
+        onLoadedMetadata={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
       />
 
-      {/* canvas — 블러 처리된 프레임 */}
-      <div className="aspect-video relative cursor-pointer bg-gray-900" onClick={togglePlay}>
-        <canvas ref={canvasRef} className="h-full w-full object-contain" />
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="rounded-full bg-black/40 p-4">
-              <svg className="h-10 w-10 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
+      {/* canvas — 블러 처리된 프레임 (blurMode !== 'none'일 때만) */}
+      {blurMode !== 'none' && (
+        <>
+          <div className="aspect-video relative cursor-pointer bg-gray-900" onClick={togglePlay}>
+            <canvas ref={canvasRef} className="h-full w-full object-contain" />
+            {!isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="rounded-full bg-black/40 p-4">
+                  <svg className="h-10 w-10 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* 커스텀 컨트롤바 */}
-      <div className="flex items-center gap-3 bg-gray-800 px-4 py-3">
-        <button onClick={togglePlay} className="text-white hover:text-violet-300 transition-colors">
-          {isPlaying
-            ? <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-            : <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          }
-        </button>
-        <span className="text-xs text-gray-400 tabular-nums w-20 shrink-0">
-          {fmtTime(currentTime)} / {fmtTime(duration)}
-        </span>
-        <input
-          type="range" min={0} max={duration || 1} step={0.1} value={currentTime}
-          onChange={handleSeek}
-          className="flex-1 h-1 accent-violet-500 cursor-pointer"
-        />
-      </div>
+          {/* 커스텀 컨트롤바 */}
+          <div className="flex items-center gap-3 bg-gray-800 px-4 py-3">
+            <button onClick={togglePlay} className="text-white hover:text-violet-300 transition-colors">
+              {isPlaying
+                ? <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                : <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              }
+            </button>
+            <span className="text-xs text-gray-400 tabular-nums w-20 shrink-0">
+              {fmtTime(currentTime)} / {fmtTime(duration)}
+            </span>
+            <input
+              type="range" min={0} max={duration || 1} step={0.1} value={currentTime}
+              onChange={handleSeek}
+              className="flex-1 h-1 accent-violet-500 cursor-pointer"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
