@@ -36,11 +36,11 @@ type BalanceTransaction = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  개인: 'bg-stone-100 text-stone-700',
-  집단: 'bg-slate-100 text-slate-700',
-  PT: 'bg-amber-100/80 text-amber-800',
-  토론: 'bg-emerald-100/80 text-emerald-800',
-  외국어: 'bg-rose-100/80 text-rose-800',
+  개인: 'border-stone-200 bg-stone-50 text-stone-700',
+  집단: 'border-stone-200 bg-stone-50 text-stone-700',
+  PT: 'border-stone-200 bg-stone-50 text-stone-700',
+  토론: 'border-stone-200 bg-stone-50 text-stone-700',
+  외국어: 'border-stone-200 bg-stone-50 text-stone-700',
 };
 
 function formatDate(iso: string) {
@@ -182,151 +182,110 @@ export default function MyPage() {
   const displayName = currentUser?.nickname || currentUser?.userName || currentUser?.loginId || '회원';
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:gap-8 lg:py-12">
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8">
       {loading ? (
-        <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-8">
+        <section className="rounded-[16px] border border-stone-200 bg-white p-6">
           <div className="rounded-[16px] bg-stone-50 px-5 py-4 text-sm text-stone-600">마이페이지를 불러오는 중입니다.</div>
         </section>
       ) : error ? (
-        <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-8">
+        <section className="rounded-[16px] border border-stone-200 bg-white p-6">
           <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
         </section>
       ) : (
         <>
-          <section className="overflow-hidden rounded-[24px] border border-stone-200 bg-white">
-            <div className="grid gap-8 px-6 py-7 sm:px-8 sm:py-8 xl:grid-cols-[1.15fr_0.9fr] xl:gap-8 xl:px-10 xl:py-10">
-              <div className="min-w-0">
-                <p className="ui-kicker">My Page</p>
-                <div className="mt-6 flex items-start gap-5">
-                  <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[20px] bg-zinc-900 text-[30px] font-black text-white">
-                    {displayName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <h1 className="ui-title truncate text-[34px] sm:text-[40px]">
-                      {displayName}
-                    </h1>
-                    <p className="mt-2 truncate text-sm text-stone-500">{currentUser?.email ?? currentUser?.loginId}</p>
-                    <p className="ui-copy mt-5 max-w-xl">
-                      계정 정보와 최근 활동을 한 곳에서 확인할 수 있습니다.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                  <StatCard label="보유 토큰" value={`${balance.toLocaleString()}T`} tone="amber" />
-                  <StatCard label="면접 이력" value={`${videos.length}개`} tone="violet" />
-                  <StatCard label="구매 내역" value={`${purchases.length}개`} tone="sky" />
+          <section className="overflow-hidden rounded-[16px] border border-violet-100/80 bg-white">
+            <div className="bg-[linear-gradient(180deg,#faf8ff_0%,#ffffff_100%)] px-5 py-6 sm:px-6">
+              <p className="text-[28px] font-bold tracking-[-0.03em] text-zinc-950">MY</p>
+              <div className="mt-5 flex items-start gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#18181b_0%,#3f3f46_100%)] text-xl font-bold text-white shadow-[0_8px_18px_rgba(24,24,27,0.14)]">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-zinc-950">{displayName}</p>
+                  <p className="mt-1 text-sm text-stone-500">{currentUser?.loginId}</p>
+                  <p className="mt-0.5 text-sm text-stone-500">{currentUser?.email ?? '이메일 정보 없음'}</p>
                 </div>
               </div>
+            </div>
 
-              <div className="grid gap-4">
-                <section className="rounded-[20px] border border-stone-200 bg-stone-50 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="ui-kicker">Current Balance</p>
-                      <p className="ui-number mt-4 text-[38px]">{balance.toLocaleString()}T</p>
-                    </div>
-                    <div className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-semibold text-stone-600">
-                      사용 가능
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-stone-500">
-                    토큰 사용 내역은 아래에서 확인할 수 있습니다.
-                  </p>
-                </section>
-
-                <section className="rounded-[20px] border border-stone-200 bg-white p-5">
-                  <SectionHeader title="바로가기" />
-                  <div className="mt-4 grid gap-3">
-                    <QuickLink href="/charge" title="토큰 충전" description="토큰 잔액을 충전합니다." />
-                    <QuickLink href="/history" title="면접 이력" description="저장한 영상과 리포트를 봅니다." />
-                    <QuickLink href="/market/purchases" title="구매 목록" description="구매한 영상을 다시 확인합니다." />
-                  </div>
-                </section>
+            <div className="grid border-t border-violet-100/80 md:grid-cols-3">
+              <StatCard label="보유 토큰" value={`${balance.toLocaleString()}T`} tone="amber" />
+              <StatCard label="면접 이력" value={`${videos.length}개`} tone="violet" />
+              <StatCard label="구매 내역" value={`${purchases.length}개`} tone="sky" />
+            </div>
+            <div className="border-t border-violet-100/80 bg-violet-50/30 px-4 py-4 sm:px-6">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <ActionButton href="/charge" title="토큰 충전" meta="잔액 충전" />
+                <ActionButton href="/history" title="면접 이력" meta="저장 영상 확인" />
+                <ActionButton href="/market/purchases" title="구매 목록" meta="구매 영상 보기" />
               </div>
             </div>
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1fr_1fr_0.92fr]">
-            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
-              <SectionHeader title="최근 면접 이력" href="/history" hrefLabel="전체 보기" />
-              <div className="mt-5 grid gap-3">
-                {latestVideos.length === 0 ? (
-                  <EmptyBlock message="아직 저장된 면접 영상이 없습니다." linkHref="/" linkLabel="면접 시작하기" />
-                ) : (
-                  latestVideos.map((video) => (
-                    <ActivityLink
-                      key={video.id}
-                      href={`/history/${video.id}`}
-                      category={video.category}
-                      title={video.title}
-                      meta={formatDate(video.createdAt)}
-                      ctaLabel="상세"
-                    />
-                  ))
-                )}
-              </div>
-            </section>
+          <section className="rounded-[16px] border border-stone-200 bg-white">
+            <SectionBlock title="최근 구매 내역" href="/market/purchases" hrefLabel="전체 보기">
+              {latestPurchases.length === 0 ? (
+                <EmptyBlock message="아직 구매한 영상이 없습니다." linkHref="/market" linkLabel="마켓 둘러보기" />
+              ) : (
+                latestPurchases.map((purchase) => (
+                  <ActivityLink
+                    key={purchase.id}
+                    href={`/market/${purchase.video.id}`}
+                    category={purchase.video.category}
+                    title={purchase.video.title}
+                    meta={`${purchase.video.seller?.nickname || '판매자'} · ${formatDate(purchase.createdAt)}`}
+                    ctaLabel={purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid}T`}
+                  />
+                ))
+              )}
+            </SectionBlock>
+          </section>
 
-            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
-              <SectionHeader title="최근 구매 내역" href="/market/purchases" hrefLabel="전체 보기" />
-              <div className="mt-5 grid gap-3">
-                {latestPurchases.length === 0 ? (
-                  <EmptyBlock message="아직 구매한 영상이 없습니다." linkHref="/market" linkLabel="마켓 둘러보기" />
-                ) : (
-                  latestPurchases.map((purchase) => (
-                    <ActivityLink
-                      key={purchase.id}
-                      href={`/market/${purchase.video.id}`}
-                      category={purchase.video.category}
-                      title={purchase.video.title}
-                      meta={`${purchase.video.seller?.nickname || '판매자'} · ${formatDate(purchase.createdAt)}`}
-                      ctaLabel="보기"
-                      trailing={purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid}T`}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
+          <section className="rounded-[16px] border border-stone-200 bg-white">
+            <SectionBlock title="최근 면접 이력" href="/history" hrefLabel="전체 보기">
+              {latestVideos.length === 0 ? (
+                <EmptyBlock message="아직 저장된 면접 영상이 없습니다." linkHref="/" linkLabel="면접 시작하기" />
+              ) : (
+                latestVideos.map((video) => (
+                  <ActivityLink
+                    key={video.id}
+                    href={`/history/${video.id}`}
+                    category={video.category}
+                    title={video.title}
+                    meta={formatDate(video.createdAt)}
+                    ctaLabel="상세"
+                  />
+                ))
+              )}
+            </SectionBlock>
+          </section>
 
-            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
-              <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-4">
-                <SectionHeader title="최근 토큰 변동" href="/charge/history" hrefLabel="전체 보기" />
-                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-600">
+          <section className="rounded-[16px] border border-stone-200 bg-white">
+            <SectionBlock
+              title="최근 토큰 변동"
+              href="/charge/history"
+              hrefLabel="전체 보기"
+              extra={
+                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600">
                   현재 {balance.toLocaleString()}T
                 </span>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                {latestTransactions.length === 0 ? (
-                  <div className="rounded-[16px] border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-stone-400">
-                    아직 토큰 변동 내역이 없습니다.
-                  </div>
-                ) : (
-                  latestTransactions.map((item) => (
-                    <div
-                      key={item.tokenTransactionId}
-                      className="rounded-[16px] border border-stone-200 bg-stone-50 px-4 py-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-zinc-900">
-                            {item.description || item.transactionType}
-                          </p>
-                          <p className="mt-1 text-xs text-stone-400">{formatDate(item.createdAt)}</p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className={`text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {formatAmount(item.amount)}
-                          </p>
-                          <p className="mt-1 text-xs text-stone-400">잔액 {item.balanceAfter.toLocaleString()}T</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+              }
+            >
+              {latestTransactions.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-stone-400">아직 토큰 변동 내역이 없습니다.</div>
+              ) : (
+                latestTransactions.map((item) => (
+                  <TransactionRow
+                    key={item.tokenTransactionId}
+                    title={item.description || item.transactionType}
+                    date={formatDate(item.createdAt)}
+                    amount={formatAmount(item.amount)}
+                    balanceAfter={item.balanceAfter}
+                    positive={item.amount >= 0}
+                  />
+                ))
+              )}
+            </SectionBlock>
           </section>
         </>
       )}
@@ -338,20 +297,49 @@ function SectionHeader({
   title,
   href,
   hrefLabel,
+  extra,
 }: {
   title: string;
   href?: string;
   hrefLabel?: string;
+  extra?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 className="ui-section-title">{title}</h2>
+      <div className="flex items-center gap-3">
+        <span className="h-2 w-2 rounded-full bg-amber-400" />
+        <h2 className="ui-section-title">{title}</h2>
+        {extra ?? null}
+      </div>
       {href && hrefLabel ? (
         <Link href={href} className="text-sm font-medium text-stone-500 transition hover:text-zinc-900">
           {hrefLabel}
         </Link>
       ) : null}
     </div>
+  );
+}
+
+function SectionBlock({
+  title,
+  href,
+  hrefLabel,
+  children,
+  extra,
+}: {
+  title: string;
+  href?: string;
+  hrefLabel?: string;
+  children: React.ReactNode;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="border-b border-violet-100/80 bg-violet-50/30 px-5 py-4">
+        <SectionHeader title={title} href={href} hrefLabel={hrefLabel} extra={extra} />
+      </div>
+      <div>{children}</div>
+    </>
   );
 }
 
@@ -366,15 +354,16 @@ function StatCard({
 }) {
   const toneClass =
     tone === 'amber'
-      ? 'border-stone-200 bg-stone-50 text-zinc-700'
+      ? 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700'
       : tone === 'sky'
-        ? 'border-stone-200 bg-stone-50 text-zinc-700'
-        : 'border-stone-200 bg-stone-50 text-zinc-700';
+        ? 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700'
+        : 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700';
 
   return (
-    <div className={`rounded-[16px] border px-5 py-5 ${toneClass}`}>
+    <div className={`relative px-5 py-5 md:border-r ${toneClass} md:last:border-r-0`}>
+      <span className="absolute left-5 top-0 h-[2px] w-10 rounded-full bg-zinc-900/75" />
       <p className="ui-label">{label}</p>
-      <p className="ui-number mt-4 text-[28px] sm:text-[30px]">{value}</p>
+      <p className="ui-number mt-5 text-[28px] sm:text-[30px]">{value}</p>
     </div>
   );
 }
@@ -389,7 +378,7 @@ function EmptyBlock({
   linkLabel: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
+    <div className="px-5 py-10 text-center">
       <p className="text-sm text-stone-400">{message}</p>
       <Link href={linkHref} className="mt-3 inline-flex text-sm font-medium text-stone-700 hover:text-zinc-900">
         {linkLabel}
@@ -416,25 +405,70 @@ function ActivityLink({
   return (
     <Link
       href={href}
-      className="group block rounded-[16px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
+      className="group flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4 transition hover:bg-stone-50/80 last:border-b-0"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${CATEGORY_COLORS[category] ?? 'bg-zinc-100 text-zinc-600'}`}
-            >
-              {category || '기타'}
-            </span>
-            {trailing ? <span className="text-xs font-medium text-stone-500">{trailing}</span> : null}
-          </div>
-          <p className="text-[15px] font-semibold leading-6 text-zinc-900">{title || '제목 없음'}</p>
-          <p className="mt-1 text-xs text-stone-400">{meta}</p>
+      <div className="min-w-0">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${CATEGORY_COLORS[category] ?? 'border-stone-200 bg-stone-50 text-stone-700'}`}
+          >
+            {category || '기타'}
+          </span>
+          {trailing ? <span className="text-xs font-medium text-stone-500">{trailing}</span> : null}
         </div>
-        <span className="shrink-0 text-sm font-medium text-stone-400 transition group-hover:text-zinc-700">
-          {ctaLabel}
-        </span>
+        <p className="truncate text-[15px] font-medium leading-6 text-zinc-900">{title || '제목 없음'}</p>
+        <p className="mt-1 text-xs text-stone-400">{meta}</p>
       </div>
+      <span className="shrink-0 text-sm font-medium text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-zinc-700">
+        {ctaLabel}
+      </span>
+    </Link>
+  );
+}
+
+function TransactionRow({
+  title,
+  date,
+  amount,
+  balanceAfter,
+  positive,
+}: {
+  title: string;
+  date: string;
+  amount: string;
+  balanceAfter: number;
+  positive: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-5 py-4 last:border-b-0">
+      <div className="min-w-0">
+        <p className="truncate text-[15px] font-medium text-zinc-900">{title}</p>
+        <p className="mt-1 text-xs text-stone-400">{date}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className={`text-sm font-semibold ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>{amount}</p>
+        <p className="mt-1 text-xs text-stone-400">잔액 {balanceAfter.toLocaleString()}T</p>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({
+  href,
+  title,
+  meta,
+}: {
+  href: string;
+  title: string;
+  meta: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[12px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
+    >
+      <p className="text-[15px] font-medium text-zinc-900">{title}</p>
+      <p className="mt-1 text-xs text-stone-500">{meta}</p>
     </Link>
   );
 }
@@ -451,11 +485,11 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="rounded-[16px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
+      className="rounded-[12px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[15px] font-semibold leading-6 text-zinc-900">{title}</p>
+          <p className="text-[15px] font-medium leading-6 text-zinc-900">{title}</p>
           <p className="mt-1 text-sm leading-6 text-stone-500">{description}</p>
         </div>
         <span className="text-sm font-medium text-stone-400">→</span>
