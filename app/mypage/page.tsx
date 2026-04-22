@@ -22,7 +22,7 @@ type PurchaseItem = {
     id: string;
     title: string;
     category: string;
-    seller: { nickname: string };
+    seller?: { nickname?: string | null } | null;
   };
 };
 
@@ -36,15 +36,24 @@ type BalanceTransaction = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  개인: 'bg-violet-100 text-violet-700',
-  집단: 'bg-blue-100 text-blue-700',
-  PT: 'bg-amber-100 text-amber-700',
-  토론: 'bg-green-100 text-green-700',
-  외국어: 'bg-rose-100 text-rose-700',
+  개인: 'bg-stone-100 text-stone-700',
+  집단: 'bg-slate-100 text-slate-700',
+  PT: 'bg-amber-100/80 text-amber-800',
+  토론: 'bg-emerald-100/80 text-emerald-800',
+  외국어: 'bg-rose-100/80 text-rose-800',
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('ko-KR', {
+  if (!iso) {
+    return '날짜 정보 없음';
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '날짜 정보 없음';
+  }
+
+  return date.toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -55,6 +64,44 @@ function formatDate(iso: string) {
 
 function formatAmount(value: number) {
   return `${value > 0 ? '+' : ''}${value.toLocaleString()}T`;
+}
+
+function normalizePurchases(input: unknown): PurchaseItem[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item) => {
+      const rawVideo = item.video;
+      const video = rawVideo && typeof rawVideo === 'object' ? (rawVideo as Record<string, unknown>) : {};
+      const seller = video.seller && typeof video.seller === 'object'
+        ? (video.seller as Record<string, unknown>)
+        : null;
+
+      return {
+        id: typeof item.id === 'string' ? item.id : '',
+        pricePaid:
+          typeof item.pricePaid === 'number'
+            ? item.pricePaid
+            : typeof item.pricePaid === 'string'
+              ? Number(item.pricePaid) || 0
+              : 0,
+        createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+        video: {
+          id: typeof video.id === 'string' ? video.id : '',
+          title: typeof video.title === 'string' ? video.title : '제목 없음',
+          category: typeof video.category === 'string' ? video.category : '기타',
+          seller: seller
+            ? {
+                nickname: typeof seller.nickname === 'string' ? seller.nickname : null,
+              }
+            : null,
+        },
+      };
+    })
+    .filter((item) => item.id && item.video.id);
 }
 
 export default function MyPage() {
@@ -110,7 +157,7 @@ export default function MyPage() {
         setBalance(balanceResult.balance);
         setTransactions(balanceResult.transactions);
         setVideos(videosData.videos);
-        setPurchases(purchasesData.purchases);
+        setPurchases(normalizePurchases(purchasesData.purchases));
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '마이페이지를 불러오지 못했습니다.');
@@ -135,184 +182,176 @@ export default function MyPage() {
   const displayName = currentUser?.nickname || currentUser?.userName || currentUser?.loginId || '회원';
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <section className="overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm">
-        <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-sky-500 px-6 py-8 text-white">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-violet-100">My Page</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight">내 정보와 활동 한눈에 보기</h1>
-          <p className="mt-2 text-sm text-violet-100">
-            보유 토큰, 최근 면접 기록, 구매 내역을 한 페이지에서 확인할 수 있습니다.
-          </p>
-        </div>
-
-        <div className="px-6 py-6">
-          {loading ? (
-            <div className="rounded-2xl bg-violet-50 px-5 py-4 text-sm text-zinc-600">마이페이지를 불러오는 중입니다.</div>
-          ) : error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
-          ) : (
-            <>
-              <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
-                <div className="rounded-3xl border border-zinc-200 bg-white p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">회원 정보</p>
-                  <div className="mt-4 flex items-center gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-lg font-bold text-white">
-                      {displayName.slice(0, 1).toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="text-lg font-bold text-zinc-900">{displayName}</p>
-                      <p className="text-sm text-zinc-500">{currentUser?.email ?? currentUser?.loginId}</p>
-                    </div>
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:gap-8 lg:py-12">
+      {loading ? (
+        <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-8">
+          <div className="rounded-[16px] bg-stone-50 px-5 py-4 text-sm text-stone-600">마이페이지를 불러오는 중입니다.</div>
+        </section>
+      ) : error ? (
+        <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-8">
+          <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
+        </section>
+      ) : (
+        <>
+          <section className="overflow-hidden rounded-[24px] border border-stone-200 bg-white">
+            <div className="grid gap-8 px-6 py-7 sm:px-8 sm:py-8 xl:grid-cols-[1.15fr_0.9fr] xl:gap-8 xl:px-10 xl:py-10">
+              <div className="min-w-0">
+                <p className="ui-kicker">My Page</p>
+                <div className="mt-6 flex items-start gap-5">
+                  <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[20px] bg-zinc-900 text-[30px] font-black text-white">
+                    {displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <h1 className="ui-title truncate text-[34px] sm:text-[40px]">
+                      {displayName}
+                    </h1>
+                    <p className="mt-2 truncate text-sm text-stone-500">{currentUser?.email ?? currentUser?.loginId}</p>
+                    <p className="ui-copy mt-5 max-w-xl">
+                      계정 정보와 최근 활동을 한 곳에서 확인할 수 있습니다.
+                    </p>
                   </div>
                 </div>
 
-                <StatCard label="보유 토큰" value={`${balance.toLocaleString()}T`} tone="amber" />
-                <StatCard label="면접 이력" value={`${videos.length}개`} tone="violet" />
-                <StatCard label="구매 내역" value={`${purchases.length}개`} tone="sky" />
+                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  <StatCard label="보유 토큰" value={`${balance.toLocaleString()}T`} tone="amber" />
+                  <StatCard label="면접 이력" value={`${videos.length}개`} tone="violet" />
+                  <StatCard label="구매 내역" value={`${purchases.length}개`} tone="sky" />
+                </div>
               </div>
 
-              <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
-                <section className="rounded-3xl border border-zinc-200 bg-white p-5">
-                  <div className="mb-4 flex items-center justify-between">
+              <div className="grid gap-4">
+                <section className="rounded-[20px] border border-stone-200 bg-stone-50 p-5">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-bold text-zinc-900">최근 면접 이력</h2>
-                      <p className="mt-1 text-sm text-zinc-500">최근 저장한 면접 영상입니다.</p>
+                      <p className="ui-kicker">Current Balance</p>
+                      <p className="ui-number mt-4 text-[38px]">{balance.toLocaleString()}T</p>
                     </div>
-                    <Link href="/history" className="text-sm font-semibold text-violet-600 hover:text-violet-700">
-                      전체 보기
-                    </Link>
+                    <div className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-semibold text-stone-600">
+                      사용 가능
+                    </div>
                   </div>
-
-                  {latestVideos.length === 0 ? (
-                    <EmptyBlock
-                      message="아직 저장된 면접 영상이 없습니다."
-                      linkHref="/"
-                      linkLabel="면접 시작하기"
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      {latestVideos.map((video) => (
-                        <Link
-                          key={video.id}
-                          href={`/history/${video.id}`}
-                          className="flex items-center justify-between rounded-2xl border border-zinc-200 px-4 py-3 transition hover:border-violet-200 hover:bg-violet-50/60"
-                        >
-                          <div className="min-w-0">
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[video.category] ?? 'bg-zinc-100 text-zinc-600'}`}>
-                                {video.category}
-                              </span>
-                            </div>
-                            <p className="truncate text-sm font-semibold text-zinc-900">{video.title}</p>
-                            <p className="mt-1 text-xs text-zinc-400">{formatDate(video.createdAt)}</p>
-                          </div>
-                          <span className="text-sm font-medium text-violet-600">상세</span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                  <p className="mt-3 text-sm leading-6 text-stone-500">
+                    토큰 사용 내역은 아래에서 확인할 수 있습니다.
+                  </p>
                 </section>
 
-                <section className="rounded-3xl border border-zinc-200 bg-white p-5">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-bold text-zinc-900">최근 구매 내역</h2>
-                      <p className="mt-1 text-sm text-zinc-500">구매한 면접 영상을 빠르게 확인합니다.</p>
-                    </div>
-                    <Link href="/market/purchases" className="text-sm font-semibold text-violet-600 hover:text-violet-700">
-                      전체 보기
-                    </Link>
-                  </div>
-
-                  {latestPurchases.length === 0 ? (
-                    <EmptyBlock
-                      message="아직 구매한 영상이 없습니다."
-                      linkHref="/market"
-                      linkLabel="마켓 둘러보기"
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      {latestPurchases.map((purchase) => (
-                        <Link
-                          key={purchase.id}
-                          href={`/market/${purchase.video.id}`}
-                          className="flex items-center justify-between rounded-2xl border border-zinc-200 px-4 py-3 transition hover:border-violet-200 hover:bg-violet-50/60"
-                        >
-                          <div className="min-w-0">
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[purchase.video.category] ?? 'bg-zinc-100 text-zinc-600'}`}>
-                                {purchase.video.category}
-                              </span>
-                              <span className="text-xs font-semibold text-amber-600">
-                                {purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid}T`}
-                              </span>
-                            </div>
-                            <p className="truncate text-sm font-semibold text-zinc-900">{purchase.video.title}</p>
-                            <p className="mt-1 text-xs text-zinc-400">
-                              {purchase.video.seller.nickname} · {formatDate(purchase.createdAt)}
-                            </p>
-                          </div>
-                          <span className="text-sm font-medium text-violet-600">보기</span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-                <section className="rounded-3xl border border-zinc-200 bg-white p-5">
-                  <h2 className="text-lg font-bold text-zinc-900">빠른 이동</h2>
-                  <p className="mt-1 text-sm text-zinc-500">자주 쓰는 기능으로 바로 이동합니다.</p>
+                <section className="rounded-[20px] border border-stone-200 bg-white p-5">
+                  <SectionHeader title="바로가기" />
                   <div className="mt-4 grid gap-3">
-                    <QuickLink href="/charge" title="토큰 충전" description="토스 결제로 토큰을 충전합니다." />
-                    <QuickLink href="/history" title="면접 이력" description="저장된 면접 영상과 리포트를 확인합니다." />
-                    <QuickLink href="/market/purchases" title="구매 목록" description="구매한 면접 영상을 다시 봅니다." />
+                    <QuickLink href="/charge" title="토큰 충전" description="토큰 잔액을 충전합니다." />
+                    <QuickLink href="/history" title="면접 이력" description="저장한 영상과 리포트를 봅니다." />
+                    <QuickLink href="/market/purchases" title="구매 목록" description="구매한 영상을 다시 확인합니다." />
                   </div>
-                </section>
-
-                <section className="rounded-3xl border border-zinc-200 bg-white p-5">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-bold text-zinc-900">최근 토큰 변동</h2>
-                      <p className="mt-1 text-sm text-zinc-500">충전과 사용 내역을 확인하세요.</p>
-                    </div>
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                      현재 {balance.toLocaleString()}T
-                    </span>
-                  </div>
-
-                  {latestTransactions.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-zinc-200 px-4 py-10 text-center text-sm text-zinc-400">
-                      아직 토큰 변동 내역이 없습니다.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {latestTransactions.map((item) => (
-                        <div key={item.tokenTransactionId} className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-zinc-900">
-                              {item.description || item.transactionType}
-                            </p>
-                            <p className="mt-1 text-xs text-zinc-400">{formatDate(item.createdAt)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {formatAmount(item.amount)}
-                            </p>
-                            <p className="mt-1 text-xs text-zinc-400">잔액 {item.balanceAfter.toLocaleString()}T</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </section>
               </div>
-            </>
-          )}
-        </div>
-      </section>
+            </div>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[1fr_1fr_0.92fr]">
+            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
+              <SectionHeader title="최근 면접 이력" href="/history" hrefLabel="전체 보기" />
+              <div className="mt-5 grid gap-3">
+                {latestVideos.length === 0 ? (
+                  <EmptyBlock message="아직 저장된 면접 영상이 없습니다." linkHref="/" linkLabel="면접 시작하기" />
+                ) : (
+                  latestVideos.map((video) => (
+                    <ActivityLink
+                      key={video.id}
+                      href={`/history/${video.id}`}
+                      category={video.category}
+                      title={video.title}
+                      meta={formatDate(video.createdAt)}
+                      ctaLabel="상세"
+                    />
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
+              <SectionHeader title="최근 구매 내역" href="/market/purchases" hrefLabel="전체 보기" />
+              <div className="mt-5 grid gap-3">
+                {latestPurchases.length === 0 ? (
+                  <EmptyBlock message="아직 구매한 영상이 없습니다." linkHref="/market" linkLabel="마켓 둘러보기" />
+                ) : (
+                  latestPurchases.map((purchase) => (
+                    <ActivityLink
+                      key={purchase.id}
+                      href={`/market/${purchase.video.id}`}
+                      category={purchase.video.category}
+                      title={purchase.video.title}
+                      meta={`${purchase.video.seller?.nickname || '판매자'} · ${formatDate(purchase.createdAt)}`}
+                      ctaLabel="보기"
+                      trailing={purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid}T`}
+                    />
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-7">
+              <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-4">
+                <SectionHeader title="최근 토큰 변동" href="/charge/history" hrefLabel="전체 보기" />
+                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-600">
+                  현재 {balance.toLocaleString()}T
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {latestTransactions.length === 0 ? (
+                  <div className="rounded-[16px] border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-stone-400">
+                    아직 토큰 변동 내역이 없습니다.
+                  </div>
+                ) : (
+                  latestTransactions.map((item) => (
+                    <div
+                      key={item.tokenTransactionId}
+                      className="rounded-[16px] border border-stone-200 bg-stone-50 px-4 py-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-zinc-900">
+                            {item.description || item.transactionType}
+                          </p>
+                          <p className="mt-1 text-xs text-stone-400">{formatDate(item.createdAt)}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className={`text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {formatAmount(item.amount)}
+                          </p>
+                          <p className="mt-1 text-xs text-stone-400">잔액 {item.balanceAfter.toLocaleString()}T</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </section>
+        </>
+      )}
     </main>
+  );
+}
+
+function SectionHeader({
+  title,
+  href,
+  hrefLabel,
+}: {
+  title: string;
+  href?: string;
+  hrefLabel?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="ui-section-title">{title}</h2>
+      {href && hrefLabel ? (
+        <Link href={href} className="text-sm font-medium text-stone-500 transition hover:text-zinc-900">
+          {hrefLabel}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
@@ -327,15 +366,15 @@ function StatCard({
 }) {
   const toneClass =
     tone === 'amber'
-      ? 'from-amber-50 to-white text-amber-700 border-amber-100'
+      ? 'border-stone-200 bg-stone-50 text-zinc-700'
       : tone === 'sky'
-        ? 'from-sky-50 to-white text-sky-700 border-sky-100'
-        : 'from-violet-50 to-white text-violet-700 border-violet-100';
+        ? 'border-stone-200 bg-stone-50 text-zinc-700'
+        : 'border-stone-200 bg-stone-50 text-zinc-700';
 
   return (
-    <div className={`rounded-3xl border bg-gradient-to-br p-5 ${toneClass}`}>
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">{label}</p>
-      <p className="mt-4 text-2xl font-black text-zinc-900">{value}</p>
+    <div className={`rounded-[16px] border px-5 py-5 ${toneClass}`}>
+      <p className="ui-label">{label}</p>
+      <p className="ui-number mt-4 text-[28px] sm:text-[30px]">{value}</p>
     </div>
   );
 }
@@ -350,12 +389,53 @@ function EmptyBlock({
   linkLabel: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-200 px-4 py-10 text-center">
-      <p className="text-sm text-zinc-400">{message}</p>
-      <Link href={linkHref} className="mt-3 inline-flex text-sm font-semibold text-violet-600 hover:text-violet-700">
+    <div className="rounded-[16px] border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
+      <p className="text-sm text-stone-400">{message}</p>
+      <Link href={linkHref} className="mt-3 inline-flex text-sm font-medium text-stone-700 hover:text-zinc-900">
         {linkLabel}
       </Link>
     </div>
+  );
+}
+
+function ActivityLink({
+  href,
+  category,
+  title,
+  meta,
+  ctaLabel,
+  trailing,
+}: {
+  href: string;
+  category: string;
+  title: string;
+  meta: string;
+  ctaLabel: string;
+  trailing?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group block rounded-[16px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${CATEGORY_COLORS[category] ?? 'bg-zinc-100 text-zinc-600'}`}
+            >
+              {category || '기타'}
+            </span>
+            {trailing ? <span className="text-xs font-medium text-stone-500">{trailing}</span> : null}
+          </div>
+          <p className="text-[15px] font-semibold leading-6 text-zinc-900">{title || '제목 없음'}</p>
+          <p className="mt-1 text-xs text-stone-400">{meta}</p>
+        </div>
+        <span className="shrink-0 text-sm font-medium text-stone-400 transition group-hover:text-zinc-700">
+          {ctaLabel}
+        </span>
+      </div>
+    </Link>
   );
 }
 
@@ -371,10 +451,15 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-zinc-200 px-4 py-4 transition hover:border-violet-200 hover:bg-violet-50/60"
+      className="rounded-[16px] border border-stone-200 bg-white px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
     >
-      <p className="text-sm font-semibold text-zinc-900">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-zinc-500">{description}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[15px] font-semibold leading-6 text-zinc-900">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-stone-500">{description}</p>
+        </div>
+        <span className="text-sm font-medium text-stone-400">→</span>
+      </div>
     </Link>
   );
 }
