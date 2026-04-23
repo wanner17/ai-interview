@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-export type BlurMode = 'none' | 'face' | 'background';
+export type BlurMode = 'none' | 'face' | 'background' | 'both';
 export type VoicePitch = 'normal' | 'high' | 'low';
 
 interface Props {
   src: string;
   blurMode: BlurMode;
   voicePitch: VoicePitch;
+  clipStart?: number;
+  clipEnd?: number;
 }
 
 const PITCH_FACTOR: Record<VoicePitch, number> = { normal: 1.0, high: 1.35, low: 0.72 };
@@ -57,11 +59,16 @@ function boxToEllipse(
   };
 }
 
-export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
+export function PrivacyVideoPlayer({ src, blurMode, voicePitch, clipStart, clipEnd }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
   const blurModeRef = useRef<BlurMode>(blurMode);
+  const clipStartRef = useRef<number | undefined>(clipStart);
+  const clipEndRef = useRef<number | undefined>(clipEnd);
+
+  useEffect(() => { clipStartRef.current = clipStart; }, [clipStart]);
+  useEffect(() => { clipEndRef.current = clipEnd; }, [clipEnd]);
 
   // BlazeFace
   const modelRef = useRef<any | null>(null);
@@ -70,6 +77,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
   const frameCountRef = useRef(0);
   const detectingRef = useRef(false);
   const offCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hasFirstDetectionRef = useRef(false);
 
   // Audio
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -106,6 +114,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
   }, [isBlurActive]);
 
   useEffect(() => {
+    hasFirstDetectionRef.current = false;
     if (!isBlurActive) {
       modelRef.current = null;
       faceBoxRef.current = null;
@@ -135,6 +144,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
         } else {
           targetFaceBoxRef.current = null;
         }
+        hasFirstDetectionRef.current = true;
       } catch (e) {
         console.warn('[blazeface detect]', e);
       } finally {
@@ -175,7 +185,12 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
           faceBoxRef.current = null;
         }
 
-        if (bm === 'background') {
+        if (bm === 'both') {
+          ctx.save();
+          ctx.filter = 'blur(24px)';
+          ctx.drawImage(videoEl, 0, 0, vw, vh);
+          ctx.restore();
+        } else if (bm === 'background') {
           ctx.save();
           ctx.filter = 'blur(24px)';
           ctx.drawImage(videoEl, 0, 0, vw, vh);
@@ -190,7 +205,13 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
             ctx.restore();
           }
         } else if (bm === 'face') {
+          if (!hasFirstDetectionRef.current) {
+            ctx.filter = 'blur(32px)';
+            ctx.drawImage(videoEl, 0, 0, vw, vh);
+            ctx.filter = 'none';
+          } else {
           ctx.drawImage(videoEl, 0, 0, vw, vh);
+          }
 
           if (face) {
             // clip 이후 filter를 적용하면 blur가 ellipse 경계 밖 픽셀 참조 불가.
@@ -289,14 +310,30 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
     return () => { cancelled = true; };
   }, [voicePitch]);
 
-  // 재생 상태 이벤트
+  // 재생 상태 이벤트 + 클립 경계 강제
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      setIsPlaying(true);
+      const cs = clipStartRef.current;
+      if (cs != null && v.currentTime < cs) v.currentTime = cs;
+    };
     const onPause = () => setIsPlaying(false);
-    const onTime = () => setCurrentTime(v.currentTime);
-    const onLoaded = () => { if (isFinite(v.duration)) setDuration(v.duration); };
+    const onTime = () => {
+      const cs = clipStartRef.current;
+      const ce = clipEndRef.current;
+      if (ce != null && v.currentTime >= ce) {
+        v.pause();
+        v.currentTime = cs ?? 0;
+      }
+      setCurrentTime(v.currentTime);
+    };
+    const onLoaded = () => {
+      if (isFinite(v.duration)) setDuration(v.duration);
+      const cs = clipStartRef.current;
+      if (cs != null && v.currentTime < cs) v.currentTime = cs;
+    };
     const onDurationChange = () => { if (isFinite(v.duration)) setDuration(v.duration); };
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
@@ -323,7 +360,13 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = videoRef.current;
-    if (v) v.currentTime = Number(e.target.value);
+    if (!v) return;
+    const cs = clipStartRef.current ?? 0;
+    const ce = clipEndRef.current;
+    let t = Number(e.target.value);
+    if (t < cs) t = cs;
+    if (ce != null && t > ce) t = ce;
+    v.currentTime = t;
   }, []);
 
   return (
@@ -335,7 +378,12 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
         crossOrigin="anonymous"
         controls={blurMode === 'none'}
         className={blurMode === 'none' ? 'aspect-video w-full object-contain' : 'hidden'}
-        onLoadedMetadata={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
+        onLoadedMetadata={() => {
+          const v = videoRef.current;
+          if (!v) return;
+          if (isFinite(v.duration)) setDuration(v.duration);
+          if (clipStart != null) v.currentTime = clipStart;
+        }}
       />
 
       {/* canvas — 블러 처리된 프레임 (blurMode !== 'none'일 때만) */}
@@ -363,10 +411,14 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
               }
             </button>
             <span className="text-xs text-gray-400 tabular-nums w-20 shrink-0">
-              {fmtTime(currentTime)} / {fmtTime(duration)}
+              {fmtTime(currentTime - (clipStart ?? 0))} / {fmtTime((clipEnd ?? duration) - (clipStart ?? 0))}
             </span>
             <input
-              type="range" min={0} max={duration || 1} step={0.1} value={currentTime}
+              type="range"
+              min={clipStart ?? 0}
+              max={clipEnd ?? duration ?? 1}
+              step={0.1}
+              value={currentTime}
               onChange={handleSeek}
               className="flex-1 h-1 accent-violet-500 cursor-pointer"
             />

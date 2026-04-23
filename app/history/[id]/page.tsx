@@ -20,9 +20,24 @@ type InterviewVideo = {
   isListed: boolean;
   blurMode: string;
   voicePitch: string;
+  clipStart: number | null;
+  clipEnd: number | null;
   createdAt: string;
   feedbackData: any;
 };
+
+function parseMmSs(str: string): number {
+  const trimmed = str.trim();
+  const parts = trimmed.split(':');
+  if (parts.length === 2) return Math.max(0, Number(parts[0]) * 60 + Number(parts[1]));
+  return Math.max(0, Number(trimmed) || 0);
+}
+
+function toMmSs(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   개인: 'bg-violet-100 text-violet-700',
@@ -54,9 +69,13 @@ export default function HistoryDetailPage() {
   const [sellDesc, setSellDesc] = useState('');
   const [sellHashtags, setSellHashtags] = useState('');
   const [sellPrice, setSellPrice] = useState(0);
-  const [sellBlurMode, setSellBlurMode] = useState<BlurMode>('none');
+  const [sellFaceBlur, setSellFaceBlur] = useState(false);
+  const [sellBgBlur, setSellBgBlur] = useState(false);
   const [sellVoicePitch, setSellVoicePitch] = useState<VoicePitch>('normal');
   const [isListed, setIsListed] = useState(false);
+  const [sellClipEnabled, setSellClipEnabled] = useState(false);
+  const [sellClipStartStr, setSellClipStartStr] = useState('0:00');
+  const [sellClipEndStr, setSellClipEndStr] = useState('0:00');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
@@ -73,9 +92,20 @@ export default function HistoryDetailPage() {
         setSellDesc(v.description ?? '');
         setSellHashtags(v.hashtags ? JSON.parse(v.hashtags).join(', ') : '');
         setSellPrice(v.price);
-        setSellBlurMode((v.blurMode as BlurMode) || 'none');
+        const bm = v.blurMode || 'none';
+        setSellFaceBlur(bm === 'face' || bm === 'both');
+        setSellBgBlur(bm === 'background' || bm === 'both');
         setSellVoicePitch((v.voicePitch as VoicePitch) || 'normal');
         setIsListed(v.isListed);
+        if (v.clipStart != null && v.clipEnd != null) {
+          setSellClipEnabled(true);
+          setSellClipStartStr(toMmSs(v.clipStart));
+          setSellClipEndStr(toMmSs(v.clipEnd));
+        } else {
+          setSellClipEnabled(false);
+          setSellClipStartStr('0:00');
+          setSellClipEndStr('0:00');
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.');
       } finally {
@@ -90,11 +120,18 @@ export default function HistoryDetailPage() {
     setSaving(true); setSaveMsg(null);
     try {
       const hashtags = sellHashtags.split(',').map(t => t.trim()).filter(Boolean);
+      const clipStartSec = sellClipEnabled ? parseMmSs(sellClipStartStr) : null;
+      const clipEndSec = sellClipEnabled ? parseMmSs(sellClipEndStr) : null;
+      if (sellClipEnabled && clipEndSec != null && clipStartSec != null && clipEndSec <= clipStartSec) {
+        setSaveMsg('종료 시간은 시작 시간보다 커야 합니다.');
+        setSaving(false);
+        return;
+      }
       const res = await fetch(`/api/my-interviews/${video.id}/sell`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ title: sellTitle, description: sellDesc, hashtags, price: sellPrice, isListed, blurMode: sellBlurMode, voicePitch: sellVoicePitch }),
+        body: JSON.stringify({ title: sellTitle, description: sellDesc, hashtags, price: sellPrice, isListed, blurMode: sellFaceBlur && sellBgBlur ? 'both' : sellFaceBlur ? 'face' : sellBgBlur ? 'background' : 'none', voicePitch: sellVoicePitch, clipStart: clipStartSec, clipEnd: clipEndSec }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
@@ -270,12 +307,15 @@ export default function HistoryDetailPage() {
                 <p className="text-xs font-bold text-amber-700">구매자에게 보여질 영상 설정</p>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-gray-600 w-24 shrink-0">얼굴·배경 처리</span>
-                  <div className="flex gap-1.5">
-                    {([{ id: 'none', label: '없음', icon: '🎥' }, { id: 'face', label: '얼굴 블러', icon: '🫥' }, { id: 'background', label: '배경 블러', icon: '🌫️' }] as const).map(opt => (
-                      <button key={opt.id} onClick={() => setSellBlurMode(opt.id)} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${sellBlurMode === opt.id ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-amber-300'}`}>
-                        <span>{opt.icon}</span><span>{opt.label}</span>
-                      </button>
-                    ))}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={sellFaceBlur} onChange={e => setSellFaceBlur(e.target.checked)} className="w-4 h-4 accent-amber-500 rounded" />
+                      <span className="text-xs font-semibold text-gray-600">🫥 얼굴 블러</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={sellBgBlur} onChange={e => setSellBgBlur(e.target.checked)} className="w-4 h-4 accent-amber-500 rounded" />
+                      <span className="text-xs font-semibold text-gray-600">🌫️ 배경 블러</span>
+                    </label>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -290,6 +330,50 @@ export default function HistoryDetailPage() {
                 </div>
               </div>
 
+              {/* 구간 판매 설정 */}
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-blue-700">특정 구간만 판매</p>
+                    <p className="text-xs text-blue-500 mt-0.5">설정 시 구매자에게 해당 구간만 재생됩니다</p>
+                  </div>
+                  <button
+                    onClick={() => setSellClipEnabled(v => !v)}
+                    className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${sellClipEnabled ? 'bg-blue-500' : 'bg-gray-200'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${sellClipEnabled ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+                {sellClipEnabled && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 w-16 shrink-0">시작 시간</label>
+                      <input
+                        value={sellClipStartStr}
+                        onChange={e => setSellClipStartStr(e.target.value)}
+                        placeholder="0:00"
+                        className="w-20 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-center focus:outline-none focus:border-blue-400 transition-colors font-mono"
+                      />
+                    </div>
+                    <span className="text-gray-400 text-sm">→</span>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-gray-600 w-16 shrink-0">종료 시간</label>
+                      <input
+                        value={sellClipEndStr}
+                        onChange={e => setSellClipEndStr(e.target.value)}
+                        placeholder="0:00"
+                        className="w-20 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-center focus:outline-none focus:border-blue-400 transition-colors font-mono"
+                      />
+                    </div>
+                    {sellClipStartStr && sellClipEndStr && parseMmSs(sellClipEndStr) > parseMmSs(sellClipStartStr) && (
+                      <span className="text-xs text-blue-600 font-semibold">
+                        ✂️ {toMmSs(parseMmSs(sellClipEndStr) - parseMmSs(sellClipStartStr))} 구간
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center gap-3 pt-1">
                 <button
                   onClick={handleSaveSell} disabled={saving}
@@ -298,7 +382,7 @@ export default function HistoryDetailPage() {
                 >
                   {saving ? '저장 중...' : '설정 저장'}
                 </button>
-                {saveMsg && <p className={`text-sm ${saveMsg.includes('실패') || saveMsg.includes('오류') ? 'text-rose-500' : 'text-emerald-600'}`}>{saveMsg}</p>}
+                {saveMsg && <p className={`text-sm ${saveMsg.includes('실패') || saveMsg.includes('오류') || saveMsg.includes('커야') ? 'text-rose-500' : 'text-emerald-600'}`}>{saveMsg}</p>}
               </div>
             </div>
           </div>

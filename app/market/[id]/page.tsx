@@ -14,10 +14,18 @@ type MarketVideoDetail = {
   price: number;
   blurMode: string;
   voicePitch: string;
+  clipStart?: number | null;
+  clipEnd?: number | null;
   videoUrl?: string;
   createdAt: string;
   seller: { userId: string; nickname: string };
 };
+
+function fmtDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   개인: 'bg-violet-100 text-violet-700', 집단: 'bg-blue-100 text-blue-700',
@@ -33,6 +41,10 @@ export default function MarketDetailPage() {
   const [canWatch, setCanWatch] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
   const [isSeller, setIsSeller] = useState(false);
+  const [purchasedBlurMode, setPurchasedBlurMode] = useState<string | null>(null);
+  const [purchasedVoicePitch, setPurchasedVoicePitch] = useState<string | null>(null);
+  const [purchasedClipStart, setPurchasedClipStart] = useState<number | null>(null);
+  const [purchasedClipEnd, setPurchasedClipEnd] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -47,6 +59,10 @@ export default function MarketDetailPage() {
     setCanWatch(data.canWatch);
     setHasPurchased(data.hasPurchased);
     setIsSeller(data.isSeller);
+    setPurchasedBlurMode(data.purchasedBlurMode ?? null);
+    setPurchasedVoicePitch(data.purchasedVoicePitch ?? null);
+    setPurchasedClipStart(data.purchasedClipStart ?? null);
+    setPurchasedClipEnd(data.purchasedClipEnd ?? null);
     setLoading(false);
   }, [params.id, router]);
 
@@ -66,8 +82,8 @@ export default function MarketDetailPage() {
   if (!video) return <div className="flex items-center justify-center min-h-screen text-gray-400">영상을 찾을 수 없습니다.</div>;
 
   const tags = video.hashtags ? JSON.parse(video.hashtags) as string[] : [];
-  const blurMode = (video.blurMode ?? 'none') as BlurMode;
-  const voicePitch = (video.voicePitch ?? 'normal') as VoicePitch;
+  const blurMode = (hasPurchased && purchasedBlurMode ? purchasedBlurMode : video.blurMode ?? 'none') as BlurMode;
+  const voicePitch = (hasPurchased && purchasedVoicePitch ? purchasedVoicePitch : video.voicePitch ?? 'normal') as VoicePitch;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -83,14 +99,28 @@ export default function MarketDetailPage() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 shadow-sm relative">
           {canWatch ? (
             <>
-              <PrivacyVideoPlayer src={video.videoUrl!} blurMode={blurMode} voicePitch={voicePitch} />
+              <PrivacyVideoPlayer
+                src={video.videoUrl!}
+                blurMode={blurMode}
+                voicePitch={voicePitch}
+                clipStart={(hasPurchased ? purchasedClipStart : video.clipStart) ?? undefined}
+                clipEnd={(hasPurchased ? purchasedClipEnd : video.clipEnd) ?? undefined}
+              />
               {/* 프라이버시 안내 배지 */}
-              {(blurMode !== 'none' || voicePitch !== 'normal') && (
-                <div className="absolute top-3 right-3 flex gap-1.5 pointer-events-none">
-                  {blurMode !== 'none' && <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">{blurMode === 'face' ? '🫥 얼굴 블러' : '🌫️ 배경 블러'}</span>}
-                  {voicePitch !== 'normal' && <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">🔊 음성 변조</span>}
-                </div>
-              )}
+              {(() => {
+                const cs = (hasPurchased ? purchasedClipStart : video.clipStart);
+                const ce = (hasPurchased ? purchasedClipEnd : video.clipEnd);
+                return (blurMode !== 'none' || voicePitch !== 'normal' || (cs != null && ce != null)) && (
+                  <div className="absolute top-3 right-3 flex gap-1.5 pointer-events-none flex-wrap justify-end">
+                    {(blurMode === 'face' || blurMode === 'both') && <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">🫥 얼굴 블러</span>}
+                    {(blurMode === 'background' || blurMode === 'both') && <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">🌫️ 배경 블러</span>}
+                    {voicePitch !== 'normal' && <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">🔊 음성 변조</span>}
+                    {cs != null && ce != null && (
+                      <span className="text-xs px-2 py-1 bg-black/60 text-white rounded-full font-medium">✂️ {fmtDuration(ce - cs)} 구간</span>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           ) : (
             <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-gray-900">
@@ -108,8 +138,16 @@ export default function MarketDetailPage() {
           <div className="flex-1 flex flex-col gap-4">
             <div className="flex items-start gap-3 flex-wrap">
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORY_COLORS[video.category] ?? 'bg-gray-100 text-gray-600'}`}>{video.category}면접</span>
-              {blurMode !== 'none' && <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full font-medium">{blurMode === 'face' ? '🫥 얼굴 블러' : '🌫️ 배경 블러'}</span>}
+              {(blurMode === 'face' || blurMode === 'both') && <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full font-medium">🫥 얼굴 블러</span>}
+              {(blurMode === 'background' || blurMode === 'both') && <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full font-medium">🌫️ 배경 블러</span>}
               {voicePitch !== 'normal' && <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full font-medium">🔊 음성 변조</span>}
+              {(() => {
+                const cs = (hasPurchased ? purchasedClipStart : video.clipStart);
+                const ce = (hasPurchased ? purchasedClipEnd : video.clipEnd);
+                return cs != null && ce != null && (
+                  <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-medium">✂️ {fmtDuration(ce - cs)} 구간 판매</span>
+                );
+              })()}
             </div>
             <h1 className="text-xl font-bold text-gray-900">{video.title}</h1>
             {video.description && <p className="text-sm text-gray-600 leading-relaxed">{video.description}</p>}

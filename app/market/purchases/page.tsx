@@ -77,7 +77,8 @@ export default function PurchasesPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[v.category]??'bg-gray-100 text-gray-600'}`}>{v.category}</span>
-                    {v.blurMode!=='none'&&<span className="text-xs text-amber-500 font-medium">{v.blurMode==='face'?'🫥 얼굴 블러':'🌫️ 배경 블러'}</span>}
+                    {(v.blurMode==='face'||v.blurMode==='both')&&<span className="text-xs text-amber-500 font-medium">🫥 얼굴 블러</span>}
+                    {(v.blurMode==='background'||v.blurMode==='both')&&<span className="text-xs text-amber-500 font-medium">🌫️ 배경 블러</span>}
                     {v.voicePitch!=='normal'&&<span className="text-xs text-amber-500 font-medium">🔊 음성 변조</span>}
                   </div>
                   <p className="text-sm font-semibold text-gray-900 truncate">{v.title}</p>
