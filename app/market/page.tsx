@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 type MarketVideo = {
@@ -13,6 +12,9 @@ type MarketVideo = {
   price: number;
   blurMode: string;
   voicePitch: string;
+  viewCount: number;
+  avgRating: number | null;
+  reviewCount: number;
   createdAt: string;
   seller: { userId: string; nickname: string };
 };
@@ -32,7 +34,6 @@ function formatDate(iso: string) {
 }
 
 export default function MarketPage() {
-  const router = useRouter();
   const [videos, setVideos] = useState<MarketVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,6 @@ export default function MarketPage() {
         if (category !== '전체') qs.set('category', category);
         if (query) qs.set('q', query);
         const res = await fetch(`/api/market?${qs.toString()}`, { credentials: 'include' });
-        if (res.status === 401) { router.replace('/?auth=login'); return; }
         const data = await res.json();
         if (!data.ok) {
           throw new Error(data.error || '마켓 목록을 불러오지 못했습니다.');
@@ -63,7 +63,7 @@ export default function MarketPage() {
       }
     }
     load();
-  }, [category, query, router]);
+  }, [category, query]);
 
   const privacyBadges = (v: MarketVideo) => {
     const badges = [];
@@ -176,6 +176,20 @@ export default function MarketPage() {
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>{v.seller.nickname}</span>
                     <span>{formatDate(v.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                    {v.avgRating != null ? (
+                      <span className="flex items-center gap-0.5 text-amber-500 font-semibold">
+                        ★ {v.avgRating.toFixed(1)}
+                        <span className="text-gray-400 font-normal ml-0.5">({v.reviewCount})</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">리뷰 없음</span>
+                    )}
+                    <span className="flex items-center gap-0.5">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                      {(v.viewCount ?? 0).toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </Link>

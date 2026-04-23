@@ -30,9 +30,12 @@ type VideoRow = {
   clipEnd: number | null;
   sellerId: string;
   feedbackData: Prisma.JsonValue | null;
+  viewCount: number;
   createdAt: Date | string;
   sellerUserId?: string;
   sellerNickname?: string;
+  avgRating?: number | null;
+  reviewCount?: number;
 };
 
 type PurchaseRow = {
@@ -67,7 +70,10 @@ function normalizeVideo(row: VideoRow) {
     clipEnd: row.clipEnd != null ? Number(row.clipEnd) : null,
     sellerId: row.sellerId,
     feedbackData: row.feedbackData,
+    viewCount: Number(row.viewCount ?? 0),
     createdAt: row.createdAt,
+    ...(row.avgRating !== undefined ? { avgRating: row.avgRating != null ? Math.round(Number(row.avgRating) * 10) / 10 : null } : {}),
+    ...(row.reviewCount !== undefined ? { reviewCount: Number(row.reviewCount ?? 0) } : {}),
     ...(row.sellerUserId && row.sellerNickname
       ? {
           seller: {
@@ -97,6 +103,7 @@ class VideoController {
         v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
+        v.view_count AS viewCount,
         v.createdAt
       FROM Video v
       WHERE v.id = ${id} AND v.sellerId = ${userId}
@@ -221,11 +228,15 @@ class VideoController {
         v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
+        v.view_count AS viewCount,
         v.createdAt,
         u.user_id AS sellerUserId,
-        u.nickname AS sellerNickname
+        u.nickname AS sellerNickname,
+        AVG(r.rating) AS avgRating,
+        COUNT(r.id) AS reviewCount
       FROM Video v
       JOIN User u ON u.user_id = v.sellerId
+      LEFT JOIN VideoReview r ON r.video_id = v.id
       WHERE v.is_listed = true
         AND (${category ?? null} IS NULL OR v.category = ${category ?? null})
         AND (
@@ -234,6 +245,7 @@ class VideoController {
           OR v.description LIKE ${likeQuery}
           OR v.hashtags LIKE ${likeQuery}
         )
+      GROUP BY v.id, u.user_id
       ORDER BY v.createdAt DESC
     `);
 
@@ -266,12 +278,17 @@ class VideoController {
         v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
+        v.view_count AS viewCount,
         v.createdAt,
         u.user_id AS sellerUserId,
-        u.nickname AS sellerNickname
+        u.nickname AS sellerNickname,
+        AVG(r.rating) AS avgRating,
+        COUNT(r.id) AS reviewCount
       FROM Video v
       JOIN User u ON u.user_id = v.sellerId
+      LEFT JOIN VideoReview r ON r.video_id = v.id
       WHERE v.id = ${id} AND v.is_listed = true
+      GROUP BY v.id, u.user_id
       LIMIT 1
     `);
     const video = rows[0] ? normalizeVideo(rows[0]) : null;
@@ -330,6 +347,7 @@ class VideoController {
         v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
+        v.view_count AS viewCount,
         v.createdAt
       FROM Video v
       WHERE v.id = ${id} AND v.is_listed = true
@@ -478,6 +496,7 @@ class VideoController {
         v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
+        v.view_count AS viewCount,
         v.createdAt
       FROM Video v
       WHERE v.sellerId = ${session.userId}
@@ -494,6 +513,101 @@ class VideoController {
     const video = await this.findOwnedVideo(id, session.userId);
     if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
     return res.json({ ok: true, video });
+  };
+
+  incrementView = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await prisma.$executeRaw(Prisma.sql`UPDATE Video SET view_count = view_count + 1 WHERE id = ${id} AND is_listed = true`);
+    return res.json({ ok: true });
+  };
+
+  getReviews = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const cookies = parseCookies(req.headers.cookie);
+    const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
+
+    type ReviewRow = {
+      id: string;
+      userId: string;
+      nickname: string;
+      rating: number;
+      body: string;
+      createdAt: Date | string;
+    };
+
+    const rows = await prisma.$queryRaw<ReviewRow[]>(Prisma.sql`
+      SELECT r.id, r.user_id AS userId, u.nickname, r.rating, r.body, r.created_at AS createdAt
+      FROM VideoReview r
+      JOIN User u ON u.user_id = r.user_id
+      WHERE r.video_id = ${id}
+      ORDER BY r.created_at DESC
+    `);
+
+    const avgRow = await prisma.$queryRaw<{ avg: number | null }[]>(Prisma.sql`
+      SELECT AVG(rating) AS avg FROM VideoReview WHERE video_id = ${id}
+    `);
+    const avgRating = avgRow[0]?.avg != null ? Math.round(Number(avgRow[0].avg) * 10) / 10 : null;
+
+    const myReview = session
+      ? rows.find(r => r.userId === session.userId) ?? null
+      : null;
+
+    return res.json({
+      ok: true,
+      reviews: rows.map(r => ({ ...r, rating: Number(r.rating) })),
+      avgRating,
+      myReview: myReview ? { ...myReview, rating: Number(myReview.rating) } : null,
+    });
+  };
+
+  createReview = async (req: Request, res: Response) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
+    if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+    const { id } = req.params;
+    const { rating, body } = req.body as { rating: number; body: string };
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ ok: false, error: '별점은 1~5 사이여야 합니다.' });
+    }
+    if (!body || body.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: '댓글 내용을 입력해주세요.' });
+    }
+    if (body.trim().length > 500) {
+      return res.status(400).json({ ok: false, error: '댓글은 500자 이내로 입력해주세요.' });
+    }
+
+    const hasPurchase = await prisma.$queryRaw<{ cnt: number }[]>(Prisma.sql`
+      SELECT COUNT(*) AS cnt FROM Purchase WHERE userId = ${session.userId} AND videoId = ${id}
+    `).then(rows => Number(rows[0]?.cnt ?? 0) > 0);
+
+    if (!hasPurchase) {
+      return res.status(403).json({ ok: false, error: '구매한 영상에만 리뷰를 작성할 수 있습니다.' });
+    }
+
+    const reviewId = randomUUID();
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO VideoReview (id, video_id, user_id, rating, body, created_at, updated_at)
+      VALUES (${reviewId}, ${id}, ${session.userId}, ${Number(rating)}, ${body.trim()}, NOW(), NOW())
+      ON DUPLICATE KEY UPDATE rating = ${Number(rating)}, body = ${body.trim()}, updated_at = NOW()
+    `);
+
+    return res.json({ ok: true });
+  };
+
+  deleteReview = async (req: Request, res: Response) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
+    if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+    const { id, reviewId } = req.params;
+    const deleted = await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM VideoReview WHERE id = ${reviewId} AND video_id = ${id} AND user_id = ${session.userId}
+    `);
+
+    if (!deleted) return res.status(404).json({ ok: false, error: '리뷰를 찾을 수 없습니다.' });
+    return res.json({ ok: true });
   };
 }
 
