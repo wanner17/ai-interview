@@ -26,6 +26,8 @@ type VideoRow = {
   isListed: boolean | number;
   blurMode: string | null;
   voicePitch: string | null;
+  clipStart: number | null;
+  clipEnd: number | null;
   sellerId: string;
   feedbackData: Prisma.JsonValue | null;
   createdAt: Date | string;
@@ -41,6 +43,8 @@ type PurchaseRow = {
   platformFee: number;
   blurMode: string | null;
   voicePitch: string | null;
+  clipStart: number | null;
+  clipEnd: number | null;
   createdAt: Date | string;
   videoTitle: string;
   videoCategory: string;
@@ -59,6 +63,8 @@ function normalizeVideo(row: VideoRow) {
     isListed: Boolean(row.isListed),
     blurMode: row.blurMode ?? 'none',
     voicePitch: row.voicePitch ?? 'normal',
+    clipStart: row.clipStart != null ? Number(row.clipStart) : null,
+    clipEnd: row.clipEnd != null ? Number(row.clipEnd) : null,
     sellerId: row.sellerId,
     feedbackData: row.feedbackData,
     createdAt: row.createdAt,
@@ -87,6 +93,8 @@ class VideoController {
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
+        v.clip_start AS clipStart,
+        v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt
@@ -141,14 +149,24 @@ class VideoController {
     if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
     const { id } = req.params;
-    const { title, description, hashtags, price, isListed, blurMode, voicePitch } = req.body as {
+    const { title, description, hashtags, price, isListed, blurMode, voicePitch, clipStart, clipEnd } = req.body as {
       title?: string; description?: string; hashtags?: string[];
       price?: number; isListed?: boolean;
       blurMode?: string; voicePitch?: string;
+      clipStart?: number | null; clipEnd?: number | null;
     };
 
     const existing = await this.findOwnedVideo(id, session.userId);
     if (!existing) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
+
+    // clip 유효성 검사
+    let newClipStart: number | null = existing.clipStart;
+    let newClipEnd: number | null = existing.clipEnd;
+    if (clipStart !== undefined) newClipStart = clipStart != null ? Math.max(0, Number(clipStart)) : null;
+    if (clipEnd !== undefined) newClipEnd = clipEnd != null ? Math.max(0, Number(clipEnd)) : null;
+    if (newClipStart != null && newClipEnd != null && newClipEnd <= newClipStart) {
+      return res.status(400).json({ ok: false, error: '종료 시간은 시작 시간보다 커야 합니다.' });
+    }
 
     await prisma.$executeRaw(
       Prisma.sql`
@@ -172,7 +190,9 @@ class VideoController {
             voicePitch !== undefined && VOICE_PITCHES.includes(voicePitch as (typeof VOICE_PITCHES)[number])
               ? voicePitch
               : existing.voicePitch
-          }
+          },
+          clip_start = ${newClipStart},
+          clip_end = ${newClipEnd}
         WHERE id = ${id} AND sellerId = ${session.userId}
       `,
     );
@@ -197,6 +217,8 @@ class VideoController {
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
+        v.clip_start AS clipStart,
+        v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt,
@@ -240,6 +262,8 @@ class VideoController {
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
+        v.clip_start AS clipStart,
+        v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt,
@@ -255,8 +279,8 @@ class VideoController {
 
     const isSeller = session?.userId === video.sellerId;
     const purchase = session
-      ? await prisma.$queryRaw<{ blurMode: string; voicePitch: string }[]>(Prisma.sql`
-          SELECT blur_mode AS blurMode, voice_pitch AS voicePitch
+      ? await prisma.$queryRaw<{ blurMode: string; voicePitch: string; clipStart: number | null; clipEnd: number | null }[]>(Prisma.sql`
+          SELECT blur_mode AS blurMode, voice_pitch AS voicePitch, clip_start AS clipStart, clip_end AS clipEnd
           FROM Purchase
           WHERE userId = ${session.userId} AND videoId = ${id}
           LIMIT 1
@@ -273,7 +297,12 @@ class VideoController {
       hasPurchased,
       isSeller,
       ...(hasPurchased && purchase
-        ? { purchasedBlurMode: purchase.blurMode, purchasedVoicePitch: purchase.voicePitch }
+        ? {
+            purchasedBlurMode: purchase.blurMode,
+            purchasedVoicePitch: purchase.voicePitch,
+            purchasedClipStart: purchase.clipStart != null ? Number(purchase.clipStart) : null,
+            purchasedClipEnd: purchase.clipEnd != null ? Number(purchase.clipEnd) : null,
+          }
         : {}),
     });
   };
@@ -297,6 +326,8 @@ class VideoController {
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
+        v.clip_start AS clipStart,
+        v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt
@@ -321,8 +352,8 @@ class VideoController {
     if (price === 0) {
       await prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, createdAt)
-          VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, ${video.blurMode}, ${video.voicePitch}, NOW())
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, clip_start, clip_end, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, ${video.blurMode}, ${video.voicePitch}, ${video.clipStart ?? null}, ${video.clipEnd ?? null}, NOW())
         `,
       );
       return res.json({ ok: true });
@@ -342,8 +373,8 @@ class VideoController {
       // Purchase 기록
       prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, createdAt)
-          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, ${video.blurMode}, ${video.voicePitch}, NOW())
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, clip_start, clip_end, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, ${video.blurMode}, ${video.voicePitch}, ${video.clipStart ?? null}, ${video.clipEnd ?? null}, NOW())
         `,
       ),
       // 구매자 토큰 트랜잭션
@@ -386,6 +417,8 @@ class VideoController {
         p.platform_fee AS platformFee,
         p.blur_mode AS blurMode,
         p.voice_pitch AS voicePitch,
+        p.clip_start AS clipStart,
+        p.clip_end AS clipEnd,
         p.createdAt,
         v.title AS videoTitle,
         v.category AS videoCategory,
@@ -409,6 +442,8 @@ class VideoController {
           category: purchase.videoCategory,
           blurMode: purchase.blurMode ?? 'none',
           voicePitch: purchase.voicePitch ?? 'normal',
+          clipStart: purchase.clipStart != null ? Number(purchase.clipStart) : null,
+          clipEnd: purchase.clipEnd != null ? Number(purchase.clipEnd) : null,
           seller: { nickname: purchase.sellerNickname },
         },
       })),
@@ -439,6 +474,8 @@ class VideoController {
         v.is_listed AS isListed,
         v.blur_mode AS blurMode,
         v.voice_pitch AS voicePitch,
+        v.clip_start AS clipStart,
+        v.clip_end AS clipEnd,
         v.sellerId AS sellerId,
         v.feedback_data AS feedbackData,
         v.createdAt

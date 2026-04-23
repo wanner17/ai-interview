@@ -38,6 +38,8 @@ model Video {
   isListed     Boolean    @default(false) @map("is_listed")
   blurMode     String     @default("none") @map("blur_mode") @db.VarChar(20)
   voicePitch   String     @default("normal") @map("voice_pitch") @db.VarChar(20)
+  clipStart    Float?     @map("clip_start")
+  clipEnd      Float?     @map("clip_end")
   sellerId     String     @db.Char(36)
   seller       User       @relation("SellerVideos", fields: [sellerId], references: [userId])
   purchases    Purchase[]
@@ -55,6 +57,8 @@ model Purchase {
   platformFee Int      @default(0) @map("platform_fee")
   blurMode    String   @default("none") @map("blur_mode") @db.VarChar(20)
   voicePitch  String   @default("normal") @map("voice_pitch") @db.VarChar(20)
+  clipStart   Float?   @map("clip_start")
+  clipEnd     Float?   @map("clip_end")
   user        User     @relation(fields: [userId], references: [userId])
   video       Video    @relation(fields: [videoId], references: [id])
   createdAt   DateTime @default(now())
