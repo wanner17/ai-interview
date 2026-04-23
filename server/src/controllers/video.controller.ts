@@ -36,6 +36,7 @@ type VideoRow = {
   sellerNickname?: string;
   avgRating?: number | null;
   reviewCount?: number;
+  purchaseCount?: number;
 };
 
 type PurchaseRow = {
@@ -74,6 +75,7 @@ function normalizeVideo(row: VideoRow) {
     createdAt: row.createdAt,
     ...(row.avgRating !== undefined ? { avgRating: row.avgRating != null ? Math.round(Number(row.avgRating) * 10) / 10 : null } : {}),
     ...(row.reviewCount !== undefined ? { reviewCount: Number(row.reviewCount ?? 0) } : {}),
+    ...(row.purchaseCount !== undefined ? { purchaseCount: Number(row.purchaseCount ?? 0) } : {}),
     ...(row.sellerUserId && row.sellerNickname
       ? {
           seller: {
@@ -210,8 +212,24 @@ class VideoController {
 
   // 마켓 목록 (isListed=true인 영상)
   marketList = async (req: Request, res: Response) => {
-    const { category, q } = req.query as { category?: string; q?: string };
+    const { category, q, sortBy, limit } = req.query as {
+      category?: string;
+      q?: string;
+      sortBy?: string;
+      limit?: string;
+    };
     const likeQuery = q ? `%${q}%` : null;
+
+    const orderBy =
+      sortBy === 'popular'
+        ? Prisma.raw('purchaseCount DESC, v.createdAt DESC')
+        : sortBy === 'rating'
+        ? Prisma.raw('avgRating DESC, reviewCount DESC, v.createdAt DESC')
+        : Prisma.raw('v.createdAt DESC');
+
+    const limitNum = limit && /^\d+$/.test(limit) ? parseInt(limit, 10) : null;
+    const limitSql = limitNum ? Prisma.raw(`LIMIT ${limitNum}`) : Prisma.raw('');
+
     const rows = await prisma.$queryRaw<VideoRow[]>(Prisma.sql`
       SELECT
         v.id,
@@ -233,7 +251,8 @@ class VideoController {
         u.user_id AS sellerUserId,
         u.nickname AS sellerNickname,
         AVG(r.rating) AS avgRating,
-        COUNT(r.id) AS reviewCount
+        COUNT(r.id) AS reviewCount,
+        (SELECT COUNT(*) FROM Purchase p WHERE p.videoId = v.id) AS purchaseCount
       FROM Video v
       JOIN User u ON u.user_id = v.sellerId
       LEFT JOIN VideoReview r ON r.video_id = v.id
@@ -246,7 +265,8 @@ class VideoController {
           OR v.hashtags LIKE ${likeQuery}
         )
       GROUP BY v.id, u.user_id
-      ORDER BY v.createdAt DESC
+      ORDER BY ${orderBy}
+      ${limitSql}
     `);
 
     const safe = rows.map((row) => {
