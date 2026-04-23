@@ -72,7 +72,6 @@ export default function Home() {
 
   // 면접 유형 선택 상태
   const [interviewType, setInterviewType] = useState<string | null>(null);
-  const [saveVideo, setSaveVideo] = useState<boolean>(false);
   const [foreignLanguage, setForeignLanguage] = useState<string>('en-US');
   const [interviewTypeStepDone, setInterviewTypeStepDone] = useState<boolean>(false);
 
@@ -743,7 +742,7 @@ export default function Home() {
   };
 
   const startVideoRecording = () => {
-    if (!saveVideo || !mediaStreamRef.current || videoRecorderRef.current) return;
+    if (!mediaStreamRef.current || videoRecorderRef.current) return;
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
@@ -839,10 +838,10 @@ export default function Home() {
 
       const recorder = videoRecorderRef.current;
       if (!recorder) { resolve(); return; }
+      videoRecorderRef.current = null;
       recorder.onstop = async () => {
         const contentType = recorder.mimeType.split(';')[0];
         const blob = new Blob(videoChunksRef.current, { type: contentType });
-        videoRecorderRef.current = null;
         videoChunksRef.current = [];
         try {
           const presignRes = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001'}/videos/presign-upload`, {
@@ -1061,8 +1060,6 @@ export default function Home() {
             onSelectType={setInterviewType}
             foreignLanguage={foreignLanguage}
             onSelectLanguage={setForeignLanguage}
-            saveVideo={saveVideo}
-            onToggleSaveVideo={() => setSaveVideo(v => !v)}
             onConfirm={() => setInterviewTypeStepDone(true)}
             onBack={() => setResumeStepDone(false)}
           />

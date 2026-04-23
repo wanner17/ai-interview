@@ -54,7 +54,8 @@ export default function HistoryDetailPage() {
   const [sellDesc, setSellDesc] = useState('');
   const [sellHashtags, setSellHashtags] = useState('');
   const [sellPrice, setSellPrice] = useState(0);
-  const [sellBlurMode, setSellBlurMode] = useState<BlurMode>('none');
+  const [sellFaceBlur, setSellFaceBlur] = useState(false);
+  const [sellBgBlur, setSellBgBlur] = useState(false);
   const [sellVoicePitch, setSellVoicePitch] = useState<VoicePitch>('normal');
   const [isListed, setIsListed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,7 +74,9 @@ export default function HistoryDetailPage() {
         setSellDesc(v.description ?? '');
         setSellHashtags(v.hashtags ? JSON.parse(v.hashtags).join(', ') : '');
         setSellPrice(v.price);
-        setSellBlurMode((v.blurMode as BlurMode) || 'none');
+        const bm = v.blurMode || 'none';
+        setSellFaceBlur(bm === 'face' || bm === 'both');
+        setSellBgBlur(bm === 'background' || bm === 'both');
         setSellVoicePitch((v.voicePitch as VoicePitch) || 'normal');
         setIsListed(v.isListed);
       } catch (e) {
@@ -94,7 +97,7 @@ export default function HistoryDetailPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ title: sellTitle, description: sellDesc, hashtags, price: sellPrice, isListed, blurMode: sellBlurMode, voicePitch: sellVoicePitch }),
+        body: JSON.stringify({ title: sellTitle, description: sellDesc, hashtags, price: sellPrice, isListed, blurMode: sellFaceBlur && sellBgBlur ? 'both' : sellFaceBlur ? 'face' : sellBgBlur ? 'background' : 'none', voicePitch: sellVoicePitch }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
@@ -270,12 +273,15 @@ export default function HistoryDetailPage() {
                 <p className="text-xs font-bold text-amber-700">구매자에게 보여질 영상 설정</p>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-gray-600 w-24 shrink-0">얼굴·배경 처리</span>
-                  <div className="flex gap-1.5">
-                    {([{ id: 'none', label: '없음', icon: '🎥' }, { id: 'face', label: '얼굴 블러', icon: '🫥' }, { id: 'background', label: '배경 블러', icon: '🌫️' }] as const).map(opt => (
-                      <button key={opt.id} onClick={() => setSellBlurMode(opt.id)} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${sellBlurMode === opt.id ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-amber-300'}`}>
-                        <span>{opt.icon}</span><span>{opt.label}</span>
-                      </button>
-                    ))}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={sellFaceBlur} onChange={e => setSellFaceBlur(e.target.checked)} className="w-4 h-4 accent-amber-500 rounded" />
+                      <span className="text-xs font-semibold text-gray-600">🫥 얼굴 블러</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={sellBgBlur} onChange={e => setSellBgBlur(e.target.checked)} className="w-4 h-4 accent-amber-500 rounded" />
+                      <span className="text-xs font-semibold text-gray-600">🌫️ 배경 블러</span>
+                    </label>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-export type BlurMode = 'none' | 'face' | 'background';
+export type BlurMode = 'none' | 'face' | 'background' | 'both';
 export type VoicePitch = 'normal' | 'high' | 'low';
 
 interface Props {
@@ -70,6 +70,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
   const frameCountRef = useRef(0);
   const detectingRef = useRef(false);
   const offCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hasFirstDetectionRef = useRef(false);
 
   // Audio
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -106,6 +107,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
   }, [isBlurActive]);
 
   useEffect(() => {
+    hasFirstDetectionRef.current = false;
     if (!isBlurActive) {
       modelRef.current = null;
       faceBoxRef.current = null;
@@ -135,6 +137,7 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
         } else {
           targetFaceBoxRef.current = null;
         }
+        hasFirstDetectionRef.current = true;
       } catch (e) {
         console.warn('[blazeface detect]', e);
       } finally {
@@ -175,7 +178,12 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
           faceBoxRef.current = null;
         }
 
-        if (bm === 'background') {
+        if (bm === 'both') {
+          ctx.save();
+          ctx.filter = 'blur(24px)';
+          ctx.drawImage(videoEl, 0, 0, vw, vh);
+          ctx.restore();
+        } else if (bm === 'background') {
           ctx.save();
           ctx.filter = 'blur(24px)';
           ctx.drawImage(videoEl, 0, 0, vw, vh);
@@ -190,7 +198,13 @@ export function PrivacyVideoPlayer({ src, blurMode, voicePitch }: Props) {
             ctx.restore();
           }
         } else if (bm === 'face') {
+          if (!hasFirstDetectionRef.current) {
+            ctx.filter = 'blur(32px)';
+            ctx.drawImage(videoEl, 0, 0, vw, vh);
+            ctx.filter = 'none';
+          } else {
           ctx.drawImage(videoEl, 0, 0, vw, vh);
+          }
 
           if (face) {
             // clip 이후 filter를 적용하면 blur가 ellipse 경계 밖 픽셀 참조 불가.

@@ -67,8 +67,8 @@ export default function MarketPage() {
 
   const privacyBadges = (v: MarketVideo) => {
     const badges = [];
-    if (v.blurMode === 'face') badges.push({ label: '얼굴 블러', icon: '🫥' });
-    if (v.blurMode === 'background') badges.push({ label: '배경 블러', icon: '🌫️' });
+    if (v.blurMode === 'face' || v.blurMode === 'both') badges.push({ label: '얼굴 블러', icon: '🫥' });
+    if (v.blurMode === 'background' || v.blurMode === 'both') badges.push({ label: '배경 블러', icon: '🌫️' });
     if (v.voicePitch !== 'normal') badges.push({ label: '음성 변조', icon: '🔊' });
     return badges;
   };

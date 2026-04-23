@@ -12,7 +12,7 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from '../lib/session';
 const ALLOWED_CONTENT_TYPES = ['video/webm', 'video/mp4', 'video/quicktime'];
 const PRESIGN_EXPIRES_IN = 900;
 const PLATFORM_FEE_RATE = 0.1;
-const BLUR_MODES = ['none', 'face', 'background'] as const;
+const BLUR_MODES = ['none', 'face', 'background', 'both'] as const;
 const VOICE_PITCHES = ['normal', 'high', 'low'] as const;
 
 type VideoRow = {
@@ -39,11 +39,11 @@ type PurchaseRow = {
   videoId: string;
   pricePaid: number;
   platformFee: number;
+  blurMode: string | null;
+  voicePitch: string | null;
   createdAt: Date | string;
   videoTitle: string;
   videoCategory: string;
-  videoBlurMode: string | null;
-  videoVoicePitch: string | null;
   sellerNickname: string;
 };
 
@@ -254,9 +254,15 @@ class VideoController {
     if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
 
     const isSeller = session?.userId === video.sellerId;
-    const hasPurchased = session
-      ? !!(await prisma.purchase.findFirst({ where: { userId: session.userId, videoId: id } }))
-      : false;
+    const purchase = session
+      ? await prisma.$queryRaw<{ blurMode: string; voicePitch: string }[]>(Prisma.sql`
+          SELECT blur_mode AS blurMode, voice_pitch AS voicePitch
+          FROM Purchase
+          WHERE userId = ${session.userId} AND videoId = ${id}
+          LIMIT 1
+        `).then(rows => rows[0] ?? null)
+      : null;
+    const hasPurchased = !!purchase;
     const canWatch = isSeller || hasPurchased || video.price === 0;
 
     const { videoUrl, ...rest } = video;
@@ -266,6 +272,9 @@ class VideoController {
       canWatch,
       hasPurchased,
       isSeller,
+      ...(hasPurchased && purchase
+        ? { purchasedBlurMode: purchase.blurMode, purchasedVoicePitch: purchase.voicePitch }
+        : {}),
     });
   };
 
@@ -312,8 +321,8 @@ class VideoController {
     if (price === 0) {
       await prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, createdAt)
-          VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, NOW())
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, 0, 0, ${video.blurMode}, ${video.voicePitch}, NOW())
         `,
       );
       return res.json({ ok: true });
@@ -333,8 +342,8 @@ class VideoController {
       // Purchase 기록
       prisma.$executeRaw(
         Prisma.sql`
-          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, createdAt)
-          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, NOW())
+          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, createdAt)
+          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, ${video.blurMode}, ${video.voicePitch}, NOW())
         `,
       ),
       // 구매자 토큰 트랜잭션
@@ -375,11 +384,11 @@ class VideoController {
         p.videoId AS videoId,
         p.price_paid AS pricePaid,
         p.platform_fee AS platformFee,
+        p.blur_mode AS blurMode,
+        p.voice_pitch AS voicePitch,
         p.createdAt,
         v.title AS videoTitle,
         v.category AS videoCategory,
-        v.blur_mode AS videoBlurMode,
-        v.voice_pitch AS videoVoicePitch,
         u.nickname AS sellerNickname
       FROM Purchase p
       JOIN Video v ON v.id = p.videoId
@@ -398,8 +407,8 @@ class VideoController {
           id: purchase.videoId,
           title: purchase.videoTitle,
           category: purchase.videoCategory,
-          blurMode: purchase.videoBlurMode ?? 'none',
-          voicePitch: purchase.videoVoicePitch ?? 'normal',
+          blurMode: purchase.blurMode ?? 'none',
+          voicePitch: purchase.voicePitch ?? 'normal',
           seller: { nickname: purchase.sellerNickname },
         },
       })),
