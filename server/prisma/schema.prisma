@@ -14,6 +14,7 @@ model User {
   passwordHash String    @map("password_hash") @db.Text
   nickname     String    @unique @db.VarChar(50)
   userName     String?   @map("user_name") @db.VarChar(191)
+  cash         Int       @default(0)
   tokens       Int       @default(0)
   userRole     String    @map("user_role") @db.VarChar(20)
   userStatus   String    @map("user_status") @db.VarChar(20)
@@ -22,9 +23,10 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
   videos       Video[]   @relation("SellerVideos")
   purchases    Purchase[]
-  paymentOrders      PaymentOrder[]
-  tokenTransactions  TokenTransaction[]
-  videoReviews       VideoReview[]
+  paymentOrders     PaymentOrder[]
+  cashTransactions  CashTransaction[]
+  tokenTransactions TokenTransaction[]
+  videoReviews      VideoReview[]
   @@map("User")
 }
 
@@ -58,6 +60,8 @@ model Purchase {
   videoId     String
   pricePaid   Int      @default(0) @map("price_paid")
   platformFee Int      @default(0) @map("platform_fee")
+  cashAmountUsed  Int      @default(0) @map("cash_amount_used")
+  tokenAmountUsed Int      @default(0) @map("token_amount_used")
   blurMode    String   @default("none") @map("blur_mode") @db.VarChar(20)
   voicePitch  String   @default("normal") @map("voice_pitch") @db.VarChar(20)
   clipStart   Float?   @map("clip_start")
@@ -79,7 +83,7 @@ model PaymentOrder {
   status           String    @db.VarChar(30)
   orderName        String    @map("order_name") @db.VarChar(191)
   amountKrw        Int       @map("amount_krw")
-  tokenAmount      Int       @map("token_amount")
+  cashAmount       Int       @map("cash_amount")
   paymentKey       String?   @unique @map("payment_key") @db.VarChar(200)
   method           String?   @db.VarChar(50)
   approvedAt       DateTime? @map("approved_at") @db.DateTime(3)
@@ -93,8 +97,8 @@ model PaymentOrder {
   createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  user User @relation(fields: [userId], references: [userId])
-  tokenTransactions TokenTransaction[]
+  user             User              @relation(fields: [userId], references: [userId])
+  cashTransactions CashTransaction[]
 
   @@index([userId, status])
   @@map("PaymentOrder")
@@ -119,7 +123,6 @@ model VideoReview {
 model TokenTransaction {
   tokenTransactionId String   @id @default(uuid()) @map("token_transaction_id") @db.Char(36)
   userId             String   @map("user_id") @db.Char(36)
-  paymentOrderId     String?  @map("payment_order_id") @db.Char(36)
   transactionType    String   @map("transaction_type") @db.VarChar(30)
   amount             Int
   balanceAfter       Int      @map("balance_after")
@@ -127,8 +130,24 @@ model TokenTransaction {
   createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
   user User @relation(fields: [userId], references: [userId])
-  paymentOrder PaymentOrder? @relation(fields: [paymentOrderId], references: [paymentOrderId])
 
   @@index([userId, createdAt])
   @@map("TokenTransaction")
+}
+
+model CashTransaction {
+  cashTransactionId String   @id @default(uuid()) @map("cash_transaction_id") @db.Char(36)
+  userId            String   @map("user_id") @db.Char(36)
+  paymentOrderId    String?  @map("payment_order_id") @db.Char(36)
+  transactionType   String   @map("transaction_type") @db.VarChar(30)
+  amount            Int
+  balanceAfter      Int      @map("balance_after")
+  description       String?  @db.VarChar(191)
+  createdAt         DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  user         User          @relation(fields: [userId], references: [userId])
+  paymentOrder PaymentOrder? @relation(fields: [paymentOrderId], references: [paymentOrderId])
+
+  @@index([userId, createdAt])
+  @@map("CashTransaction")
 }

@@ -7,7 +7,7 @@ import { fetchCurrentUser } from '../../lib/auth';
 import { fetchBalance } from '../../lib/billing';
 
 type BalanceTransaction = {
-  tokenTransactionId: string;
+  cashTransactionId: string;
   transactionType: string;
   amount: number;
   balanceAfter: number;
@@ -26,7 +26,7 @@ function formatDate(iso: string) {
 }
 
 function formatAmount(value: number) {
-  return `${value > 0 ? '+' : ''}${value.toLocaleString()}T`;
+  return `${value > 0 ? '+' : ''}${value.toLocaleString()}C`;
 }
 
 export default function ChargeHistoryPage() {
@@ -56,11 +56,11 @@ export default function ChargeHistoryPage() {
           return;
         }
 
-        setBalance(balanceResult.balance);
-        setTransactions(balanceResult.transactions);
+        setBalance(balanceResult.cashBalance);
+        setTransactions(balanceResult.cashTransactions);
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : '토큰 내역을 불러오지 못했습니다.');
+          setError(loadError instanceof Error ? loadError.message : '캐시 내역을 불러오지 못했습니다.');
         }
       } finally {
         if (!cancelled) {
@@ -81,13 +81,13 @@ export default function ChargeHistoryPage() {
       <section className="rounded-[24px] border border-stone-200 bg-white p-6 sm:p-8">
         <div className="flex flex-col gap-3 border-b border-stone-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-stone-400">Token History</p>
-            <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-zinc-950">토큰 전체 내역</h1>
-            <p className="mt-2 text-sm text-stone-500">충전과 사용 기록, 각 시점의 잔액을 확인할 수 있습니다.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-stone-400">Cash History</p>
+            <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-zinc-950">캐시 전체 내역</h1>
+            <p className="mt-2 text-sm text-stone-500">충전과 사용 기록, 각 시점의 캐시 잔액을 확인할 수 있습니다.</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-sm font-semibold text-stone-600">
-              현재 {balance.toLocaleString()}T
+              현재 {balance.toLocaleString()}C
             </span>
             <Link
               href="/charge"
@@ -99,17 +99,17 @@ export default function ChargeHistoryPage() {
         </div>
 
         {loading ? (
-          <div className="mt-6 rounded-[16px] bg-stone-50 px-5 py-4 text-sm text-stone-600">토큰 내역을 불러오는 중입니다.</div>
+          <div className="mt-6 rounded-[16px] bg-stone-50 px-5 py-4 text-sm text-stone-600">캐시 내역을 불러오는 중입니다.</div>
         ) : error ? (
           <div className="mt-6 rounded-[16px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{error}</div>
         ) : transactions.length === 0 ? (
           <div className="mt-6 rounded-[16px] border border-dashed border-stone-200 bg-stone-50 px-5 py-12 text-center text-sm text-stone-500">
-            아직 토큰 변동 내역이 없습니다.
+            아직 캐시 변동 내역이 없습니다.
           </div>
         ) : (
           <div className="mt-6 grid gap-3">
             {transactions.map((item) => (
-              <div key={item.tokenTransactionId} className="rounded-[16px] border border-stone-200 bg-stone-50 px-4 py-4 sm:px-5">
+              <div key={item.cashTransactionId} className="rounded-[16px] border border-stone-200 bg-stone-50 px-4 py-4 sm:px-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-zinc-900">
@@ -121,7 +121,7 @@ export default function ChargeHistoryPage() {
                     <p className={`text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {formatAmount(item.amount)}
                     </p>
-                    <p className="mt-1 text-xs text-stone-400">잔액 {item.balanceAfter.toLocaleString()}T</p>
+                    <p className="mt-1 text-xs text-stone-400">잔액 {item.balanceAfter.toLocaleString()}C</p>
                   </div>
                 </div>
               </div>

@@ -191,11 +191,17 @@ export function Header() {
                       className="mt-1 flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-amber-700 transition-colors hover:bg-amber-50"
                     >
                       <span>충전하기</span>
-                      <span className="text-xs text-amber-500">토큰 충전</span>
+                      <span className="text-xs text-amber-500">캐시 충전</span>
                     </Link>
                     <div className="mt-1 flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5 text-sm">
-                      <span className="font-medium text-gray-700">보유 토큰</span>
+                      <span className="font-medium text-gray-700">보유 캐시</span>
                       <span className="font-semibold text-amber-700">
+                        {currentUser?.cash?.toLocaleString() ?? 0}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5 text-sm">
+                      <span className="font-medium text-gray-700">보유 토큰</span>
+                      <span className="font-semibold text-emerald-700">
                         {currentUser?.tokens?.toLocaleString() ?? 0}
                       </span>
                     </div>
@@ -285,7 +291,8 @@ export function Header() {
                 <div className="rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-3 text-sm">
                   <p className="font-semibold text-gray-800">{displayName}</p>
                   <p className="text-xs text-gray-500">@{currentUser?.loginId}</p>
-                  <p className="mt-2 text-xs font-semibold text-amber-700">토큰 {currentUser?.tokens?.toLocaleString() ?? 0}</p>
+                  <p className="mt-2 text-xs font-semibold text-amber-700">캐시 {currentUser?.cash?.toLocaleString() ?? 0}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">토큰 {currentUser?.tokens?.toLocaleString() ?? 0}</p>
                 </div>
                 <button
                   type="button"

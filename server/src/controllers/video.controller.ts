@@ -397,45 +397,83 @@ class VideoController {
       return res.json({ ok: true });
     }
 
-    // 유료 영상: 트랜잭션으로 토큰 이동
+    // 유료 영상: token 우선, 부족분은 cash 차감
     const buyer = await prisma.user.findUnique({ where: { userId: session.userId } });
-    if (!buyer || buyer.tokens < price) {
-      return res.status(400).json({ ok: false, error: '토큰이 부족합니다.' });
+    if (!buyer || buyer.cash + buyer.tokens < price) {
+      return res.status(400).json({ ok: false, error: '캐시와 토큰이 부족합니다.' });
     }
 
-    await prisma.$transaction([
-      // 구매자 토큰 차감
-      prisma.user.update({ where: { userId: session.userId }, data: { tokens: { decrement: price } } }),
-      // 판매자 토큰 지급 (90%)
-      prisma.user.update({ where: { userId: video.sellerId }, data: { tokens: { increment: sellerIncome } } }),
-      // Purchase 기록
-      prisma.$executeRaw(
-        Prisma.sql`
-          INSERT INTO Purchase (id, userId, videoId, price_paid, platform_fee, blur_mode, voice_pitch, clip_start, clip_end, createdAt)
-          VALUES (${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, ${video.blurMode}, ${video.voicePitch}, ${video.clipStart ?? null}, ${video.clipEnd ?? null}, NOW())
-        `,
-      ),
-      // 구매자 토큰 트랜잭션
-      prisma.tokenTransaction.create({
+    const tokenAmountUsed = Math.min(buyer.tokens, price);
+    const cashAmountUsed = price - tokenAmountUsed;
+
+    await prisma.$transaction(async (tx) => {
+      const seller = await tx.user.findUnique({ where: { userId: video.sellerId } });
+      if (!seller) {
+        throw new Error('판매자를 찾을 수 없습니다.');
+      }
+
+      const updatedBuyer = await tx.user.update({
+        where: { userId: session.userId },
         data: {
-          userId: session.userId,
-          transactionType: 'video_purchase',
-          amount: -price,
-          balanceAfter: buyer.tokens - price,
-          description: `영상 구매: ${video.title}`,
+          tokens: { decrement: tokenAmountUsed },
+          cash: { decrement: cashAmountUsed },
         },
-      }),
-      // 판매자 토큰 트랜잭션
-      prisma.tokenTransaction.create({
+      });
+
+      const updatedSeller = await tx.user.update({
+        where: { userId: video.sellerId },
+        data: {
+          cash: { increment: sellerIncome },
+        },
+      });
+
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO Purchase (
+            id, userId, videoId, price_paid, platform_fee, cash_amount_used, token_amount_used,
+            blur_mode, voice_pitch, clip_start, clip_end, createdAt
+          )
+          VALUES (
+            ${randomUUID()}, ${session.userId}, ${id}, ${price}, ${platformFee}, ${cashAmountUsed}, ${tokenAmountUsed},
+            ${video.blurMode}, ${video.voicePitch}, ${video.clipStart ?? null}, ${video.clipEnd ?? null}, NOW()
+          )
+        `,
+      );
+
+      if (tokenAmountUsed > 0) {
+        await tx.tokenTransaction.create({
+          data: {
+            userId: session.userId,
+            transactionType: 'video_purchase',
+            amount: -tokenAmountUsed,
+            balanceAfter: updatedBuyer.tokens,
+            description: `영상 구매 토큰 사용: ${video.title}`,
+          },
+        });
+      }
+
+      if (cashAmountUsed > 0) {
+        await tx.cashTransaction.create({
+          data: {
+            userId: session.userId,
+            transactionType: 'video_purchase',
+            amount: -cashAmountUsed,
+            balanceAfter: updatedBuyer.cash,
+            description: `영상 구매 캐시 사용: ${video.title}`,
+          },
+        });
+      }
+
+      await tx.cashTransaction.create({
         data: {
           userId: video.sellerId,
           transactionType: 'video_sale',
           amount: sellerIncome,
-          balanceAfter: 0, // 정확한 잔액은 별도 조회 필요
-          description: `영상 판매: ${video.title} (수수료 ${platformFee}T 제외)`,
+          balanceAfter: updatedSeller.cash,
+          description: `영상 판매: ${video.title} (수수료 ${platformFee}C 제외)`,
         },
-      }),
-    ]);
+      });
+    });
 
     return res.json({ ok: true });
   };

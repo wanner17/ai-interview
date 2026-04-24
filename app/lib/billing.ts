@@ -13,7 +13,7 @@ async function parseResponse(response: Response) {
 export type ChargePackage = {
   packageId: 'starter' | 'standard' | 'pro';
   amountKrw: number;
-  tokenAmount: number;
+  cashAmount: number;
   orderName: string;
 };
 
@@ -21,7 +21,7 @@ export type ChargeOrder = {
   orderId: string;
   orderName: string;
   amount: number;
-  tokenAmount: number;
+  cashAmount: number;
   customerKey: string;
   customerName: string;
   customerEmail: string | null;
@@ -64,8 +64,8 @@ export async function confirmCharge(paymentKey: string, orderId: string, amount:
     ok: true;
     orderId: string;
     status: string;
-    chargedTokens: number;
-    balance: number | null;
+    chargedCash: number;
+    cashBalance: number | null;
   };
 }
 
@@ -76,8 +76,17 @@ export async function fetchBalance() {
   const data = await parseResponse(response);
   return data as {
     ok: true;
-    balance: number;
-    transactions: Array<{
+    cashBalance: number;
+    tokenBalance: number;
+    cashTransactions: Array<{
+      cashTransactionId: string;
+      transactionType: string;
+      amount: number;
+      balanceAfter: number;
+      description: string | null;
+      createdAt: string;
+    }>;
+    tokenTransactions: Array<{
       tokenTransactionId: string;
       transactionType: string;
       amount: number;

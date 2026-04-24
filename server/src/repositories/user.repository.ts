@@ -48,6 +48,7 @@ class UserRepository {
     email: string;
     passwordHash: string;
     nickname: string;
+    cash: number;
     tokens: number;
     userName?: string;
     userRole: string;
@@ -75,6 +76,7 @@ class UserRepository {
     email: string | null;
     nickname: string;
     userName: string | null;
+    cash: number;
     tokens: number;
     userRole: string;
     userStatus: string;
@@ -88,6 +90,7 @@ class UserRepository {
       email: user.email,
       nickname: user.nickname,
       userName: user.userName,
+      cash: user.cash,
       tokens: user.tokens,
       userRole: user.userRole,
       userStatus: user.userStatus,

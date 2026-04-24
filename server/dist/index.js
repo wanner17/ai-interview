@@ -13,6 +13,7 @@ const speech_1 = require("@google-cloud/speech");
 const openai_1 = __importDefault(require("openai"));
 const multer_1 = __importDefault(require("multer"));
 const auth_route_1 = require("./routes/auth.route");
+const attendance_route_1 = require("./routes/attendance.route");
 const billing_route_1 = require("./routes/billing.route");
 const video_route_1 = require("./routes/video.route");
 const session_1 = require("./lib/session");
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 });
 app.use(express_1.default.json());
 app.use('/auth', auth_route_1.authRouter);
+app.use('/attendance', attendance_route_1.attendanceRouter);
 app.use('/billing', billing_route_1.billingRouter);
 app.use('/videos', video_route_1.videoRouter);
 const io = new socket_io_1.Server(httpServer, {

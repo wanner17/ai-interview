@@ -1,7 +1,6 @@
 import type { LoginRequest, SignUpRequest } from '../types/auth.type';
 import { randomUUID } from 'crypto';
 import { userRepository } from '../repositories/user.repository';
-import { billingRepository } from '../repositories/billing.repository';
 import { createSessionToken, hashPassword, verifyPassword, verifySessionToken } from '../lib/session';
 
 const ACTIVE_USER_STATUS = 'ACTIVE';
@@ -63,17 +62,11 @@ class AuthService {
       email,
       passwordHash,
       nickname,
-      tokens: 10,
+      cash: 0,
+      tokens: 0,
       userName: userName ?? undefined,
       userRole: DEFAULT_USER_ROLE,
       userStatus: ACTIVE_USER_STATUS,
-    });
-    await billingRepository.createTokenTransaction({
-      userId: user.userId,
-      transactionType: 'CHARGE',
-      amount: 10,
-      balanceAfter: 10,
-      description: '회원가입 축하 토큰',
     });
 
     const sessionToken = createSessionToken(user.userId);

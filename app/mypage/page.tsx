@@ -27,7 +27,7 @@ type PurchaseItem = {
 };
 
 type BalanceTransaction = {
-  tokenTransactionId: string;
+  cashTransactionId: string;
   transactionType: string;
   amount: number;
   balanceAfter: number;
@@ -63,7 +63,7 @@ function formatDate(iso: string) {
 }
 
 function formatAmount(value: number) {
-  return `${value > 0 ? '+' : ''}${value.toLocaleString()}T`;
+  return `${value > 0 ? '+' : ''}${value.toLocaleString()}C`;
 }
 
 function normalizePurchases(input: unknown): PurchaseItem[] {
@@ -107,7 +107,7 @@ function normalizePurchases(input: unknown): PurchaseItem[] {
 export default function MyPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [balance, setBalance] = useState<number>(0);
+  const [cashBalance, setCashBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<BalanceTransaction[]>([]);
   const [videos, setVideos] = useState<InterviewVideo[]>([]);
   const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
@@ -154,8 +154,8 @@ export default function MyPage() {
         }
 
         setCurrentUser(user);
-        setBalance(balanceResult.balance);
-        setTransactions(balanceResult.transactions);
+        setCashBalance(balanceResult.cashBalance);
+        setTransactions(balanceResult.cashTransactions);
         setVideos(videosData.videos);
         setPurchases(normalizePurchases(purchasesData.purchases));
       } catch (loadError) {
@@ -208,15 +208,17 @@ export default function MyPage() {
               </div>
             </div>
 
-            <div className="grid border-t border-violet-100/80 md:grid-cols-3">
-              <StatCard label="보유 토큰" value={`${balance.toLocaleString()}T`} tone="amber" />
+            <div className="grid border-t border-violet-100/80 md:grid-cols-4">
+              <StatCard label="보유 캐시" value={`${cashBalance.toLocaleString()}C`} tone="amber" />
+              <StatCard label="보유 토큰" value={`${currentUser?.tokens?.toLocaleString() ?? 0}T`} tone="emerald" />
               <StatCard label="면접 이력" value={`${videos.length}개`} tone="violet" />
               <StatCard label="구매 내역" value={`${purchases.length}개`} tone="sky" />
             </div>
             <div className="border-t border-violet-100/80 bg-violet-50/30 px-4 py-4 sm:px-6">
               <div className="grid gap-2 sm:grid-cols-3">
-                <ActionButton href="/charge" title="토큰 충전" meta="잔액 충전" />
+                <ActionButton href="/charge" title="캐시 충전" meta="유상 캐시 충전" />
                 <ActionButton href="/history" title="면접 이력" meta="저장 영상 확인" />
+                <ActionButton href="/attendance" title="출석체크" meta="하루 1회 1토큰 받기" />
                 <ActionButton href="/market/purchases" title="구매 목록" meta="구매 영상 보기" />
               </div>
             </div>
@@ -234,7 +236,7 @@ export default function MyPage() {
                     category={purchase.video.category}
                     title={purchase.video.title}
                     meta={`${purchase.video.seller?.nickname || '판매자'} · ${formatDate(purchase.createdAt)}`}
-                    ctaLabel={purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid}T`}
+                    ctaLabel={purchase.pricePaid === 0 ? '무료' : `${purchase.pricePaid} 사용`}
                   />
                 ))
               )}
@@ -262,21 +264,21 @@ export default function MyPage() {
 
           <section className="rounded-[16px] border border-stone-200 bg-white">
             <SectionBlock
-              title="최근 토큰 변동"
+              title="최근 캐시 변동"
               href="/charge/history"
               hrefLabel="전체 보기"
               extra={
                 <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600">
-                  현재 {balance.toLocaleString()}T
+                  현재 {cashBalance.toLocaleString()}C
                 </span>
               }
             >
               {latestTransactions.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-stone-400">아직 토큰 변동 내역이 없습니다.</div>
+                <div className="px-5 py-10 text-center text-sm text-stone-400">아직 캐시 변동 내역이 없습니다.</div>
               ) : (
                 latestTransactions.map((item) => (
                   <TransactionRow
-                    key={item.tokenTransactionId}
+                    key={item.cashTransactionId}
                     title={item.description || item.transactionType}
                     date={formatDate(item.createdAt)}
                     amount={formatAmount(item.amount)}
@@ -350,11 +352,13 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  tone: 'amber' | 'violet' | 'sky';
+  tone: 'amber' | 'emerald' | 'violet' | 'sky';
 }) {
   const toneClass =
     tone === 'amber'
       ? 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700'
+      : tone === 'emerald'
+        ? 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5fff8_100%)] text-zinc-700'
       : tone === 'sky'
         ? 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700'
         : 'border-violet-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] text-zinc-700';
@@ -447,7 +451,7 @@ function TransactionRow({
       </div>
       <div className="shrink-0 text-right">
         <p className={`text-sm font-semibold ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>{amount}</p>
-        <p className="mt-1 text-xs text-stone-400">잔액 {balanceAfter.toLocaleString()}T</p>
+        <p className="mt-1 text-xs text-stone-400">잔액 {balanceAfter.toLocaleString()}C</p>
       </div>
     </div>
   );

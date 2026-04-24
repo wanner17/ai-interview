@@ -30,7 +30,7 @@ export default function ChargePage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [packages, setPackages] = useState<ChargePackage[]>([]);
-  const [balance, setBalance] = useState<number | null>(null);
+  const [cashBalance, setCashBalance] = useState<number | null>(null);
   const [selectedPackageId, setSelectedPackageId] = useState<ChargePackage['packageId']>('starter');
   const [sdkReady, setSdkReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +59,7 @@ export default function ChargePage() {
 
         setCurrentUser(user);
         setPackages(packagesResult.packages);
-        setBalance(balanceResult.balance);
+        setCashBalance(balanceResult.cashBalance);
         if (packagesResult.packages.length > 0) {
           setSelectedPackageId(packagesResult.packages[0].packageId);
         }
@@ -150,10 +150,10 @@ export default function ChargePage() {
       <Script src={TOSS_SDK_SRC} strategy="afterInteractive" onLoad={() => setSdkReady(true)} />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-violet-500">Token Charge</p>
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900">토큰 충전</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-violet-500">Cash Charge</p>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900">캐시 충전</h1>
           <p className="max-w-2xl text-sm leading-7 text-zinc-600">
-            토스페이먼츠 결제창으로 충전 주문을 생성한 뒤, 결제 승인 완료 시 토큰이 지급됩니다.
+            토스페이먼츠 결제창으로 충전 주문을 생성한 뒤, 결제 승인 완료 시 캐시가 지급됩니다.
           </p>
         </div>
 
@@ -192,7 +192,7 @@ export default function ChargePage() {
                       }`}
                     >
                       <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-500">{item.packageId}</p>
-                      <p className="mt-3 text-2xl font-black text-zinc-900">{item.tokenAmount.toLocaleString()} 토큰</p>
+                      <p className="mt-3 text-2xl font-black text-zinc-900">{item.cashAmount.toLocaleString()} 캐시</p>
                       <p className="mt-2 text-sm text-zinc-500">{item.orderName}</p>
                       <p className="mt-5 text-lg font-bold text-zinc-800">{item.amountKrw.toLocaleString()}원</p>
                     </button>
@@ -206,8 +206,8 @@ export default function ChargePage() {
               <div className="mt-5 rounded-3xl bg-white/10 p-5 backdrop-blur">
                 <p className="text-sm text-violet-100">현재 계정</p>
                 <p className="mt-1 text-xl font-bold">{getChargeCustomerName(currentUser)}</p>
-                <p className="mt-4 text-sm text-violet-100">현재 보유 토큰</p>
-                <p className="mt-1 text-3xl font-black">{(balance ?? currentUser?.tokens ?? 0).toLocaleString()}</p>
+                <p className="mt-4 text-sm text-violet-100">현재 보유 캐시</p>
+                <p className="mt-1 text-3xl font-black">{(cashBalance ?? currentUser?.cash ?? 0).toLocaleString()}</p>
               </div>
 
               <div className="mt-5 rounded-3xl border border-white/10 bg-white/10 p-5">
@@ -215,8 +215,8 @@ export default function ChargePage() {
                 <p className="mt-1 text-lg font-bold">{selectedPackage?.orderName ?? '상품 선택 필요'}</p>
                 <p className="mt-4 text-sm text-violet-100">결제 금액</p>
                 <p className="mt-1 text-2xl font-black">{selectedPackage ? `${selectedPackage.amountKrw.toLocaleString()}원` : '-'}</p>
-                <p className="mt-4 text-sm text-violet-100">지급 토큰</p>
-                <p className="mt-1 text-xl font-bold">{selectedPackage ? `+${selectedPackage.tokenAmount.toLocaleString()} 토큰` : '-'}</p>
+                <p className="mt-4 text-sm text-violet-100">지급 캐시</p>
+                <p className="mt-1 text-xl font-bold">{selectedPackage ? `+${selectedPackage.cashAmount.toLocaleString()} 캐시` : '-'}</p>
               </div>
 
               <button

@@ -39,6 +39,6 @@ export type TossWebhookPayload = {
 export type ChargePackage = {
   packageId: ChargePackageId;
   amountKrw: number;
-  tokenAmount: number;
+  cashAmount: number;
   orderName: string;
 };

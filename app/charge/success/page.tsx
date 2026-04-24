@@ -11,8 +11,8 @@ export default function ChargeSuccessPage() {
   const [result, setResult] = useState<{
     orderId: string;
     status: string;
-    chargedTokens: number;
-    balance: number | null;
+    chargedCash: number;
+    cashBalance: number | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +63,7 @@ export default function ChargeSuccessPage() {
         <h1 className="mt-3 text-3xl font-black tracking-tight text-zinc-900">결제 승인 결과</h1>
 
         {isSubmitting && (
-          <p className="mt-6 text-sm leading-7 text-zinc-600">결제 승인 API를 호출하고 토큰 적립을 처리하는 중입니다.</p>
+          <p className="mt-6 text-sm leading-7 text-zinc-600">결제 승인 API를 호출하고 캐시 적립을 처리하는 중입니다.</p>
         )}
 
         {error && (
@@ -76,8 +76,8 @@ export default function ChargeSuccessPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <InfoCard label="주문번호" value={result.orderId} />
             <InfoCard label="주문상태" value={result.status} />
-            <InfoCard label="지급 토큰" value={`${result.chargedTokens.toLocaleString()} 토큰`} />
-            <InfoCard label="현재 잔액" value={result.balance !== null ? `${result.balance.toLocaleString()} 토큰` : '조회 불가'} />
+            <InfoCard label="지급 캐시" value={`${result.chargedCash.toLocaleString()} 캐시`} />
+            <InfoCard label="현재 캐시" value={result.cashBalance !== null ? `${result.cashBalance.toLocaleString()} 캐시` : '조회 불가'} />
           </div>
         )}
 

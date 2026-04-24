@@ -17,7 +17,7 @@ class BillingRepository {
       status: string;
       orderName: string;
       amountKrw: number;
-      tokenAmount: number;
+      cashAmount: number;
       rawPayload?: Prisma.InputJsonValue;
     },
     executor?: PrismaExecutor,
@@ -85,6 +85,21 @@ class BillingRepository {
     });
   }
 
+  async incrementUserCash(
+    userId: string,
+    amount: number,
+    executor?: PrismaExecutor,
+  ) {
+    return this.getClient(executor).user.update({
+      where: { userId },
+      data: {
+        cash: {
+          increment: amount,
+        },
+      },
+    });
+  }
+
   async incrementUserTokens(
     userId: string,
     amount: number,
@@ -103,7 +118,6 @@ class BillingRepository {
   async createTokenTransaction(
     data: {
       userId: string;
-      paymentOrderId?: string | null;
       transactionType: string;
       amount: number;
       balanceAfter: number;
@@ -112,6 +126,28 @@ class BillingRepository {
     executor?: PrismaExecutor,
   ) {
     return this.getClient(executor).tokenTransaction.create({
+      data: {
+        userId: data.userId,
+        transactionType: data.transactionType,
+        amount: data.amount,
+        balanceAfter: data.balanceAfter,
+        description: data.description,
+      },
+    });
+  }
+
+  async createCashTransaction(
+    data: {
+      userId: string;
+      paymentOrderId?: string | null;
+      transactionType: string;
+      amount: number;
+      balanceAfter: number;
+      description?: string;
+    },
+    executor?: PrismaExecutor,
+  ) {
+    return this.getClient(executor).cashTransaction.create({
       data: {
         userId: data.userId,
         paymentOrderId: data.paymentOrderId ?? undefined,
@@ -123,11 +159,41 @@ class BillingRepository {
     });
   }
 
+  async listCashTransactions(userId: string, executor?: PrismaExecutor) {
+    return this.getClient(executor).cashTransaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+  }
+
   async listTokenTransactions(userId: string, executor?: PrismaExecutor) {
     return this.getClient(executor).tokenTransaction.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 20,
+    });
+  }
+
+  async listTokenTransactionsByTypeAndRange(
+    userId: string,
+    transactionType: string,
+    startAt: Date,
+    endAt: Date,
+    executor?: PrismaExecutor,
+  ) {
+    return this.getClient(executor).tokenTransaction.findMany({
+      where: {
+        userId,
+        transactionType,
+        createdAt: {
+          gte: startAt,
+          lt: endAt,
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
     });
   }
 }

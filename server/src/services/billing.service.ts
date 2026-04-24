@@ -15,7 +15,7 @@ import type {
 
 const TOSS_API_BASE_URL = 'https://api.tosspayments.com/v1/payments';
 const PAYMENT_PROVIDER = 'TOSS_PAYMENTS';
-const ORDER_TYPE_CHARGE = 'TOKEN_CHARGE';
+const ORDER_TYPE_CHARGE = 'CASH_CHARGE';
 const STATUS_PENDING = 'PENDING';
 const STATUS_PAID = 'PAID';
 const STATUS_FAILED = 'FAILED';
@@ -26,20 +26,20 @@ const CHARGE_PACKAGES: Record<ChargePackageId, ChargePackage> = {
   starter: {
     packageId: 'starter',
     amountKrw: 5500,
-    tokenAmount: 50,
-    orderName: '토큰 50개 충전',
+    cashAmount: 50,
+    orderName: '캐시 50 충전',
   },
   standard: {
     packageId: 'standard',
     amountKrw: 11000,
-    tokenAmount: 110,
-    orderName: '토큰 110개 충전',
+    cashAmount: 110,
+    orderName: '캐시 110 충전',
   },
   pro: {
     packageId: 'pro',
     amountKrw: 33000,
-    tokenAmount: 350,
-    orderName: '토큰 350개 충전',
+    cashAmount: 350,
+    orderName: '캐시 350 충전',
   },
 };
 
@@ -103,7 +103,7 @@ class BillingService {
       status: STATUS_PENDING,
       orderName: chargePackage.orderName,
       amountKrw: chargePackage.amountKrw,
-      tokenAmount: chargePackage.tokenAmount,
+      cashAmount: chargePackage.cashAmount,
       rawPayload: {
         packageId: chargePackage.packageId,
       },
@@ -115,7 +115,7 @@ class BillingService {
         orderId: order.orderId,
         orderName: order.orderName,
         amount: order.amountKrw,
-        tokenAmount: order.tokenAmount,
+        cashAmount: order.cashAmount,
         customerKey: user.userId,
         customerName: user.userName || user.nickname,
         customerEmail: user.email,
@@ -130,12 +130,24 @@ class BillingService {
       throw new BillingError('사용자를 찾을 수 없습니다.', 404);
     }
 
-    const transactions = await billingRepository.listTokenTransactions(userId);
+    const [cashTransactions, tokenTransactions] = await Promise.all([
+      billingRepository.listCashTransactions(userId),
+      billingRepository.listTokenTransactions(userId),
+    ]);
 
     return {
       ok: true as const,
-      balance: user.tokens,
-      transactions: transactions.map((transaction) => ({
+      cashBalance: user.cash,
+      tokenBalance: user.tokens,
+      cashTransactions: cashTransactions.map((transaction) => ({
+        cashTransactionId: transaction.cashTransactionId,
+        transactionType: transaction.transactionType,
+        amount: transaction.amount,
+        balanceAfter: transaction.balanceAfter,
+        description: transaction.description,
+        createdAt: transaction.createdAt.toISOString(),
+      })),
+      tokenTransactions: tokenTransactions.map((transaction) => ({
         tokenTransactionId: transaction.tokenTransactionId,
         transactionType: transaction.transactionType,
         amount: transaction.amount,
@@ -158,7 +170,7 @@ class BillingService {
         orderId: order.orderId,
         status: order.status,
         amount: order.amountKrw,
-        tokenAmount: order.tokenAmount,
+        cashAmount: order.cashAmount,
         orderName: order.orderName,
         paymentKey: order.paymentKey,
         approvedAt: order.approvedAt?.toISOString() ?? null,
@@ -182,7 +194,6 @@ class BillingService {
 
     const data = (await response.json()) as Record<string, unknown>;
     if (!response.ok) {
-      const code = typeof data.code === 'string' ? data.code : null;
       const message =
         typeof data.message === 'string'
           ? data.message
@@ -201,8 +212,8 @@ class BillingService {
         ok: true as const,
         orderId: existingByPaymentKey.orderId,
         status: existingByPaymentKey.status,
-        chargedTokens: existingByPaymentKey.tokenAmount,
-        balance: null,
+        chargedCash: existingByPaymentKey.cashAmount,
+        cashBalance: null,
       };
     }
 
@@ -217,8 +228,8 @@ class BillingService {
         return {
           orderId: order.orderId,
           status: order.status,
-          chargedTokens: order.tokenAmount,
-          balance: user?.tokens ?? null,
+          chargedCash: order.cashAmount,
+          cashBalance: user?.cash ?? null,
         };
       }
 
@@ -245,12 +256,12 @@ class BillingService {
         return {
           orderId: updatedOrder.orderId,
           status: updatedOrder.status,
-          chargedTokens: 0,
-          balance: null,
+          chargedCash: 0,
+          cashBalance: null,
         };
       }
 
-      const updatedUser = await billingRepository.incrementUserTokens(order.userId, order.tokenAmount, tx);
+      const updatedUser = await billingRepository.incrementUserCash(order.userId, order.cashAmount, tx);
       const updatedOrder = await billingRepository.updatePaymentOrderStatus(
         order.orderId,
         {
@@ -265,14 +276,14 @@ class BillingService {
         tx,
       );
 
-      await billingRepository.createTokenTransaction(
+      await billingRepository.createCashTransaction(
         {
           userId: order.userId,
           paymentOrderId: updatedOrder.paymentOrderId,
           transactionType: 'CHARGE',
-          amount: order.tokenAmount,
-          balanceAfter: updatedUser.tokens,
-          description: `${order.orderName} 충전`,
+          amount: order.cashAmount,
+          balanceAfter: updatedUser.cash,
+          description: `${order.orderName}`,
         },
         tx,
       );
@@ -280,8 +291,8 @@ class BillingService {
       return {
         orderId: updatedOrder.orderId,
         status: updatedOrder.status,
-        chargedTokens: order.tokenAmount,
-        balance: updatedUser.tokens,
+        chargedCash: order.cashAmount,
+        cashBalance: updatedUser.cash,
       };
     });
 
@@ -303,8 +314,8 @@ class BillingService {
         ok: true as const,
         orderId: order.orderId,
         status: order.status,
-        chargedTokens: order.tokenAmount,
-        balance: user?.tokens ?? null,
+        chargedCash: order.cashAmount,
+        cashBalance: user?.cash ?? null,
       };
     }
 

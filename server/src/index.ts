@@ -10,6 +10,7 @@ import { SpeechClient } from '@google-cloud/speech';
 import OpenAI from 'openai';
 import multer from 'multer';
 import { authRouter } from './routes/auth.route';
+import { attendanceRouter } from './routes/attendance.route';
 import { billingRouter } from './routes/billing.route';
 import { videoRouter } from './routes/video.route';
 import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/session';
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use('/auth', authRouter);
+app.use('/attendance', attendanceRouter);
 app.use('/billing', billingRouter);
 app.use('/videos', videoRouter);
 
@@ -265,7 +267,7 @@ function getUserIdFromSocket(socket: any): string | null {
   return session?.userId ?? null;
 }
 
-// ── 토큰 차감 (3토큰/면접) ─────────────────────────────────────────────────────
+// ── 캐시 차감 (3캐시/면접) ─────────────────────────────────────────────────────
 async function deductInterviewTokens(userId: string | null, socket: any): Promise<boolean> {
   if (!userId) {
     socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
@@ -276,17 +278,17 @@ async function deductInterviewTokens(userId: string | null, socket: any): Promis
     socket.emit('interview_error', { code: 'AUTH_REQUIRED', message: '로그인이 필요합니다.' });
     return false;
   }
-  if (user.tokens < 3) {
-    socket.emit('interview_error', { code: 'INSUFFICIENT_TOKENS', message: `토큰이 부족합니다. 현재 ${user.tokens}토큰 (면접 1회 = 3토큰)` });
+  if (user.cash < 3) {
+    socket.emit('interview_error', { code: 'INSUFFICIENT_CASH', message: `캐시가 부족합니다. 현재 ${user.cash}캐시 (면접 1회 = 3캐시)` });
     return false;
   }
   await prisma.$transaction(async (tx) => {
-    await billingRepository.incrementUserTokens(userId, -3, tx);
-    await billingRepository.createTokenTransaction({
+    await billingRepository.incrementUserCash(userId, -3, tx);
+    await billingRepository.createCashTransaction({
       userId,
       transactionType: 'USE',
       amount: -3,
-      balanceAfter: user.tokens - 3,
+      balanceAfter: user.cash - 3,
       description: '면접 이용',
     }, tx);
   });

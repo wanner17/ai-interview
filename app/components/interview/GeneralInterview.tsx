@@ -53,7 +53,7 @@ export function GeneralInterview({
             <div className="flex flex-col items-center gap-3">
               {currentUser && (
                 <p className="text-sm text-gray-400 dark:text-gray-500">
-                  보유 토큰: <span className="font-bold text-amber-600">{currentUser.tokens}</span>토큰 (면접 1회 = 3토큰 차감)
+                  보유 캐시: <span className="font-bold text-amber-600">{currentUser.cash}</span>캐시 (면접 1회 = 3캐시 차감)
                 </p>
               )}
               <button

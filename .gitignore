@@ -47,3 +47,11 @@ google-stt-key.json
 /ai-interview-db-info.txt
 /server/node_modules/
 .claude/settings.json
+
+# IDE
+.codex
+.idea/
+rebel.xml
+
+# server dist (compiled files)
+/server/dist/
