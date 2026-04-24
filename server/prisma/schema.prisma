@@ -24,6 +24,7 @@ model User {
   purchases    Purchase[]
   paymentOrders      PaymentOrder[]
   tokenTransactions  TokenTransaction[]
+  videoReviews       VideoReview[]
   @@map("User")
 }
 
@@ -43,7 +44,9 @@ model Video {
   sellerId     String     @db.Char(36)
   seller       User       @relation("SellerVideos", fields: [sellerId], references: [userId])
   purchases    Purchase[]
+  reviews      VideoReview[]
   feedbackData Json?      @map("feedback_data")
+  viewCount    Int        @default(0) @map("view_count")
   createdAt    DateTime   @default(now())
 
   @@map("Video")
@@ -95,6 +98,22 @@ model PaymentOrder {
 
   @@index([userId, status])
   @@map("PaymentOrder")
+}
+
+model VideoReview {
+  id        String   @id @default(cuid())
+  videoId   String   @map("video_id")
+  userId    String   @db.Char(36) @map("user_id")
+  rating    Int
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  video Video @relation(fields: [videoId], references: [id])
+  user  User  @relation(fields: [userId], references: [userId])
+
+  @@unique([videoId, userId])
+  @@map("VideoReview")
 }
 
 model TokenTransaction {

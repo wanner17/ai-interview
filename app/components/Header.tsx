@@ -8,12 +8,12 @@ import { type AuthUser, fetchCurrentUser, logout } from '../lib/auth';
 
 const navItems = [
   { label: '면접 시작', href: '/' },
+  { label: '면접 마켓', href: '/market' },
   { label: '면접 유형', href: '/interview-types' },
   { label: '이용 가이드', href: '/guide' },
 ];
 
 const authNavItems = [
-  { label: '면접 마켓', href: '/market' },
   { label: '면접 이력', href: '/history' },
 ];
 
