@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
@@ -47,7 +48,7 @@ export default function RootLayout({
           }} />
         </div>
         <div className="relative flex flex-col min-h-full" style={{ zIndex: 1 }}>
-          <Header />
+          <Suspense fallback={null}><Header /></Suspense>
           <main className="flex-1 flex flex-col">
             {children}
           </main>

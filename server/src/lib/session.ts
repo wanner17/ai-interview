@@ -91,13 +91,15 @@ export async function verifyPassword(password: string, passwordHash: string) {
 
 function serializeCookie(name: string, value: string, maxAge: number) {
   const secure = process.env.NODE_ENV === 'production';
+  const cookieDomain = process.env.COOKIE_DOMAIN;
   return [
     `${name}=${value}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    secure ? 'SameSite=Lax' : 'SameSite=Lax',
     `Max-Age=${maxAge}`,
     secure ? 'Secure' : '',
+    cookieDomain ? `Domain=${cookieDomain}` : '',
   ]
     .filter(Boolean)
     .join('; ');

@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { confirmCharge } from '../../lib/billing';
 
-export default function ChargeSuccessPage() {
+function ChargeSuccessContent() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(true);
   const [result, setResult] = useState<{
@@ -57,44 +58,42 @@ export default function ChargeSuccessPage() {
   }, [searchParams]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-16 sm:px-6">
-      <div className="rounded-[2rem] border border-violet-100 bg-white/90 p-8 shadow-sm backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-violet-500">Charge Success</p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-zinc-900">결제 승인 결과</h1>
+    <div className="rounded-[2rem] border border-violet-100 bg-white/90 p-8 shadow-sm backdrop-blur">
+      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-violet-500">Charge Success</p>
+      <h1 className="mt-3 text-3xl font-black tracking-tight text-zinc-900">결제 승인 결과</h1>
 
-        {isSubmitting && (
-          <p className="mt-6 text-sm leading-7 text-zinc-600">결제 승인 API를 호출하고 캐시 적립을 처리하는 중입니다.</p>
-        )}
+      {isSubmitting && (
+        <p className="mt-6 text-sm leading-7 text-zinc-600">결제 승인 API를 호출하고 캐시 적립을 처리하는 중입니다.</p>
+      )}
 
-        {error && (
-          <div className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <InfoCard label="주문번호" value={result.orderId} />
-            <InfoCard label="주문상태" value={result.status} />
-            <InfoCard label="지급 캐시" value={`${result.chargedCash.toLocaleString()} 캐시`} />
-            <InfoCard label="현재 캐시" value={result.cashBalance !== null ? `${result.cashBalance.toLocaleString()} 캐시` : '조회 불가'} />
-          </div>
-        )}
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/charge"
-            className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100"
-          >
-            다시 충전하기
-          </Link>
-          <Link
-            href="/"
-            className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-bold text-zinc-600 transition hover:border-violet-200 hover:text-violet-700"
-          >
-            메인으로
-          </Link>
+      {error && (
+        <div className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
+          {error}
         </div>
+      )}
+
+      {result && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <InfoCard label="주문번호" value={result.orderId} />
+          <InfoCard label="주문상태" value={result.status} />
+          <InfoCard label="지급 캐시" value={`${result.chargedCash.toLocaleString()} 캐시`} />
+          <InfoCard label="현재 캐시" value={result.cashBalance !== null ? `${result.cashBalance.toLocaleString()} 캐시` : '조회 불가'} />
+        </div>
+      )}
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link
+          href="/charge"
+          className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-sm font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100"
+        >
+          다시 충전하기
+        </Link>
+        <Link
+          href="/"
+          className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-bold text-zinc-600 transition hover:border-violet-200 hover:text-violet-700"
+        >
+          메인으로
+        </Link>
       </div>
     </div>
   );
@@ -105,6 +104,16 @@ function InfoCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
       <p className="mt-3 break-all text-lg font-bold text-zinc-900">{value}</p>
+    </div>
+  );
+}
+
+export default function ChargeSuccessPage() {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-16 sm:px-6">
+      <Suspense fallback={null}>
+        <ChargeSuccessContent />
+      </Suspense>
     </div>
   );
 }

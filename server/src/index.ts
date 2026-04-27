@@ -10,7 +10,7 @@ import { SpeechClient } from '@google-cloud/speech';
 import OpenAI from 'openai';
 import multer from 'multer';
 import { authRouter } from './routes/auth.route';
-import { attendanceRouter } from './routes/attendance.route';
+// import { attendanceRouter } from './routes/attendance.route';
 import { billingRouter } from './routes/billing.route';
 import { videoRouter } from './routes/video.route';
 import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/session';
@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use('/auth', authRouter);
-app.use('/attendance', attendanceRouter);
+// app.use('/attendance', attendanceRouter);
 app.use('/billing', billingRouter);
 app.use('/videos', videoRouter);
 
@@ -41,8 +41,13 @@ const io = new Server(httpServer, {
 });
 
 let speechClient: SpeechClient | null = null;
-try { speechClient = new SpeechClient(); }
-catch { console.log('⚠️ GCP STT Mock 모드'); }
+try {
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    speechClient = new SpeechClient({ credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON) });
+  } else {
+    speechClient = new SpeechClient();
+  }
+} catch { console.log('⚠️ GCP STT Mock 모드'); }
 
 const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy_key' });
