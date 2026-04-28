@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Readable } from 'stream';
 import { Prisma } from '@prisma/client';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -326,10 +327,10 @@ class VideoController {
     const hasPurchased = !!purchase;
     const canWatch = isSeller || hasPurchased || video.price === 0;
 
-    const { videoUrl, ...rest } = video;
+    const { videoUrl: _videoUrl, ...rest } = video;
     return res.json({
       ok: true,
-      video: canWatch ? video : rest,
+      video: rest,
       canWatch,
       hasPurchased,
       isSeller,
@@ -342,6 +343,54 @@ class VideoController {
           }
         : {}),
     });
+  };
+
+  streamVideo = async (req: Request, res: Response) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const session = verifySessionToken(cookies[SESSION_COOKIE_NAME]);
+    if (!session) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+    const { id } = req.params;
+    const rows = await prisma.$queryRaw<{ videoUrl: string; sellerId: string; price: number }[]>(Prisma.sql`
+      SELECT videoUrl, sellerId, price FROM Video WHERE id = ${id} AND is_listed = true LIMIT 1
+    `);
+    const video = rows[0];
+    if (!video) return res.status(404).json({ ok: false, error: '영상을 찾을 수 없습니다.' });
+
+    const isSeller = video.sellerId === session.userId;
+    const hasPurchase = !isSeller
+      ? await prisma.$queryRaw<{ cnt: bigint }[]>(Prisma.sql`
+          SELECT COUNT(*) AS cnt FROM Purchase WHERE userId = ${session.userId} AND videoId = ${id}
+        `).then(r => Number(r[0]?.cnt ?? 0) > 0)
+      : false;
+    const canWatch = isSeller || hasPurchase || Number(video.price) === 0;
+    if (!canWatch) return res.status(403).json({ ok: false, error: '접근 권한이 없습니다.' });
+
+    const rangeHeader = req.headers['range'];
+    const fetchHeaders: Record<string, string> = {};
+    if (rangeHeader) fetchHeaders['Range'] = rangeHeader;
+
+    const r2Res = await fetch(video.videoUrl, { headers: fetchHeaders });
+    if (!r2Res.ok && r2Res.status !== 206) {
+      return res.status(502).json({ ok: false, error: '스트리밍 실패' });
+    }
+
+    res.status(r2Res.status);
+    const contentType = r2Res.headers.get('content-type');
+    const contentLength = r2Res.headers.get('content-length');
+    const contentRange = r2Res.headers.get('content-range');
+    const acceptRanges = r2Res.headers.get('accept-ranges');
+    if (contentType) res.setHeader('Content-Type', contentType);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+    if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+    res.setHeader('Cache-Control', 'no-store, private');
+
+    if (r2Res.body) {
+      Readable.fromWeb(r2Res.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+    } else {
+      res.end();
+    }
   };
 
   // 영상 구매

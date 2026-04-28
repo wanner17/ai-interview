@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "인패스 - AI 면접 시뮬레이터",
-  description: "AI 기반 실전 면접 시뮬레이터",
+  title: "인패스 - AI로 분석하는 나만의 합격 면접 공식",
+  description: "AI로 분석하는 나만의 합격 면접 공식",
 };
 
 export default function RootLayout({

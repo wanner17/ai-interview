@@ -56,7 +56,7 @@ export function AuthPanel({
               <Image src="/logo.png" alt="인패스 로고" width={40} height={40} className="h-12 w-12 brightness-0 invert" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">나에게 딱맞는 인터뷰</h1>
+              <h1 className="text-2xl font-black tracking-tight">AI로 분석하는 나만의 합격 면접 공식</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">회원가입 또는 로그인 후 면접을 시작할 수 있습니다.</p>
             </div>
           </div>

@@ -16,7 +16,6 @@ type MarketVideoDetail = {
   voicePitch: string;
   clipStart?: number | null;
   clipEnd?: number | null;
-  videoUrl?: string;
   viewCount: number;
   createdAt: string;
   seller: { userId: string; nickname: string };
@@ -191,7 +190,7 @@ export default function MarketDetailPage() {
           {canWatch ? (
             <>
               <PrivacyVideoPlayer
-                src={video.videoUrl!}
+                src={`/api/video-stream/${video.id}`}
                 blurMode={blurMode}
                 voicePitch={voicePitch}
                 clipStart={(hasPurchased ? purchasedClipStart : video.clipStart) ?? undefined}

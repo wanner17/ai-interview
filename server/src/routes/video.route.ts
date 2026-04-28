@@ -15,6 +15,7 @@ videoRouter.post('/market/:id/view', videoController.incrementView);
 videoRouter.get('/market/:id/reviews', videoController.getReviews);
 videoRouter.post('/market/:id/reviews', videoController.createReview);
 videoRouter.delete('/market/:id/reviews/:reviewId', videoController.deleteReview);
+videoRouter.get('/stream/:id', videoController.streamVideo);
 videoRouter.get('/:id', videoController.getOne);
 videoRouter.get('/', videoController.list);
 
